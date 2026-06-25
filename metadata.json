@@ -1,0 +1,6 @@
+{
+  "name": "PulseWire Africa",
+  "description": "Modern, professional, SEO-optimized news and media platform for African and global news.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
