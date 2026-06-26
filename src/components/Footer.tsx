@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { subscribeNewsletter } from '../lib/db';
 import { Mail, Check, AlertCircle, ArrowRight, Twitter, Facebook, Instagram, Linkedin, Globe } from 'lucide-react';
 import { CATEGORIES } from '../types';
+import Logo from './Logo';
 
 interface FooterProps {
   navigate: (path: string) => void;
@@ -96,17 +97,7 @@ export default function Footer({ navigate }: FooterProps) {
         
         {/* Col 1: About */}
         <div className="flex flex-col space-y-4">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-emerald-700 rounded-lg flex items-center justify-center shadow-md">
-              <div className="w-0.5 h-5 bg-white"></div>
-              <div className="w-0.5 h-3.5 bg-emerald-200 mx-0.5"></div>
-              <div className="w-0.5 h-4 bg-white"></div>
-            </div>
-            <span className="text-base font-black tracking-tighter text-slate-800 dark:text-white">PULSEWIRE<span className="text-emerald-700 dark:text-emerald-400">AFRICA</span></span>
-          </div>
-          <p className="text-xs text-slate-600 dark:text-gray-300 leading-relaxed font-sans">
-            PulseWire Africa &mdash; <strong className="text-emerald-700 dark:text-emerald-400 font-bold">Connecting Africa to the World&apos;s Stories.</strong>
-          </p>
+          <Logo variant="full" />
           <p className="text-xs text-slate-500 dark:text-gray-400 leading-relaxed font-sans">
             A premier, high-integrity digital news network reporting investigative stories, corporate business, technology breakthroughs, and sports insights.
           </p>

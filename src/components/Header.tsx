@@ -24,6 +24,7 @@ import {
   Bookmark
 } from 'lucide-react';
 import { CATEGORIES } from '../types';
+import Logo from './Logo';
 
 interface HeaderProps {
   currentPath: string;
@@ -117,18 +118,8 @@ export default function Header({
         </button>
 
         {/* Center/Left: PulseWire Logo */}
-        <div className="flex items-center space-x-3 cursor-pointer" onClick={() => { navigate('/'); setShowMobileMenu(false); }}>
-          <div className="w-10 h-10 bg-emerald-700 rounded-lg flex items-center justify-center shadow-lg shrink-0">
-            <div className="w-1 h-6 bg-white animate-pulse"></div>
-            <div className="w-1 h-4 bg-emerald-200 mx-0.5"></div>
-            <div className="w-1 h-5 bg-white"></div>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-xl font-black tracking-tighter text-slate-800 dark:text-white font-sans flex items-center animate-fade-in">
-              PULSEWIRE<span className="text-emerald-700 dark:text-emerald-400">AFRICA</span>
-            </span>
-            <span className="text-[9px] md:text-[10px] text-emerald-600 dark:text-emerald-400 font-bold -mt-0.5 tracking-wide">Connecting Africa to the World&apos;s Stories</span>
-          </div>
+        <div onClick={() => { navigate('/'); setShowMobileMenu(false); }}>
+          <Logo variant="header" />
         </div>
 
         {/* Desktop Search bar */}

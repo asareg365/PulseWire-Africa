@@ -66,6 +66,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
   const [editorCategories, setEditorCategories] = useState<string[]>(['ghana']);
   const [editorTags, setEditorTags] = useState('');
   const [editorFeaturedImage, setEditorFeaturedImage] = useState('');
+  const [editorImages, setEditorImages] = useState<string[]>([]);
   const [editorStatus, setEditorStatus] = useState<'draft' | 'published' | 'scheduled'>('draft');
   const [editorIsSponsored, setEditorIsSponsored] = useState(false);
   const [editorIsAffiliate, setEditorIsAffiliate] = useState(false);
@@ -180,6 +181,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
     setEditorCategories(['ghana']);
     setEditorTags('');
     setEditorFeaturedImage('https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80');
+    setEditorImages([]);
     setEditorStatus('draft');
     setEditorIsSponsored(false);
     setEditorIsAffiliate(false);
@@ -197,6 +199,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
     setEditorCategories(art.categories || (art.category ? [art.category] : ['ghana']));
     setEditorTags(art.tags.join(', '));
     setEditorFeaturedImage(art.featuredImage);
+    setEditorImages(art.images || []);
     setEditorStatus(art.status);
     setEditorIsSponsored(art.isSponsored);
     setEditorIsAffiliate(art.isAffiliate);
@@ -236,6 +239,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
       categories: editorCategories,
       tags: editorTags.split(',').map(t => t.trim()).filter(Boolean),
       featuredImage: editorFeaturedImage,
+      images: editorImages,
       status: editorStatus,
       isSponsored: editorIsSponsored,
       isAffiliate: editorIsAffiliate,
@@ -784,21 +788,152 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                     </div>
 
                     {unsplashResults.length > 0 && (
-                      <div className="grid grid-cols-2 gap-2 mt-3">
+                      <div className="grid grid-cols-2 gap-3 mt-3">
                         {unsplashResults.map((url, uIdx) => (
                           <div 
                             key={uIdx}
-                            onClick={() => setEditorFeaturedImage(url)}
-                            className={`cursor-pointer overflow-hidden rounded border-2 transition-all ${
-                              editorFeaturedImage === url ? 'border-red-600 scale-95' : 'border-transparent hover:border-gray-300'
-                            }`}
+                            className="relative overflow-hidden rounded border border-gray-200 dark:border-gray-800 transition-all bg-white dark:bg-gray-900 group/item h-16"
                           >
-                            <img src={url} alt="Lookup option" className="w-full h-12 object-cover" />
+                            <img src={url} alt="Lookup option" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/80 opacity-0 group-hover/item:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1 z-20">
+                              <button
+                                type="button"
+                                onClick={() => setEditorFeaturedImage(url)}
+                                className={`w-full py-1 px-1.5 rounded text-[9px] font-black uppercase tracking-wider text-center transition-all ${
+                                  editorFeaturedImage === url ? 'bg-red-600 text-white' : 'bg-white text-gray-900 hover:bg-gray-200'
+                                }`}
+                              >
+                                {editorFeaturedImage === url ? '✓ Cover' : 'Set Cover'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!editorImages.includes(url)) {
+                                    setEditorImages([...editorImages, url]);
+                                  }
+                                }}
+                                className={`w-full py-1 px-1.5 rounded text-[9px] font-black uppercase tracking-wider text-center transition-all ${
+                                  editorImages.includes(url) ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-white hover:bg-gray-700'
+                                }`}
+                              >
+                                {editorImages.includes(url) ? '✓ Attached' : '+ Gallery'}
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* Supplementary Gallery Imagery */}
+                <div className="p-5 bg-gray-50 dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 space-y-4">
+                  <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest font-mono block">Attached News Media Gallery</span>
+                  
+                  {/* Manual add input */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Add Image URL manually</label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        id="manual-gallery-img"
+                        placeholder="Paste any dynamic news image URL..."
+                        className="flex-1 p-2 rounded bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-xs text-gray-900 dark:text-white"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const input = e.target as HTMLInputElement;
+                            const val = input.value.trim();
+                            if (val && !editorImages.includes(val)) {
+                              setEditorImages([...editorImages, val]);
+                              input.value = '';
+                            }
+                          }
+                        }}
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const input = document.getElementById('manual-gallery-img') as HTMLInputElement;
+                          const val = input?.value.trim();
+                          if (val && !editorImages.includes(val)) {
+                            setEditorImages([...editorImages, val]);
+                            input.value = '';
+                          }
+                        }}
+                        className="px-3 rounded bg-emerald-700 text-white hover:bg-emerald-800 text-xs font-bold transition-colors"
+                      >
+                        Attach
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Attached images list */}
+                  {editorImages.length > 0 ? (
+                    <div className="space-y-2">
+                      <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Attached Media ({editorImages.length})</label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {editorImages.map((imgUrl, idx) => (
+                          <div key={idx} className="relative aspect-[4/3] rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 overflow-hidden group/attached">
+                            <img src={imgUrl} alt="Attached thumbnail" className="w-full h-full object-cover" />
+                            
+                            {/* Re-order & Delete Controls overlay */}
+                            <div className="absolute inset-0 bg-slate-950/85 opacity-0 group-hover/attached:opacity-100 transition-opacity flex flex-col items-center justify-between p-2">
+                              <span className="text-[9px] font-mono font-medium text-slate-300">Photo {idx + 1}</span>
+                              
+                              <div className="flex items-center gap-1.5">
+                                {idx > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const list = [...editorImages];
+                                      const temp = list[idx];
+                                      list[idx] = list[idx - 1];
+                                      list[idx - 1] = temp;
+                                      setEditorImages(list);
+                                    }}
+                                    className="p-1 rounded bg-white/10 text-white hover:bg-emerald-700 text-xs font-bold w-6 h-6 flex items-center justify-center transition-colors"
+                                    title="Move Left/Up"
+                                  >
+                                    ◀
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setEditorImages(editorImages.filter((_, i) => i !== idx))}
+                                  className="px-2 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-[9px] font-extrabold uppercase transition-colors"
+                                  title="Remove Image"
+                                >
+                                  Remove
+                                </button>
+                                {idx < editorImages.length - 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const list = [...editorImages];
+                                      const temp = list[idx];
+                                      list[idx] = list[idx + 1];
+                                      list[idx + 1] = temp;
+                                      setEditorImages(list);
+                                    }}
+                                    className="p-1 rounded bg-white/10 text-white hover:bg-emerald-700 text-xs font-bold w-6 h-6 flex items-center justify-center transition-colors"
+                                    title="Move Right/Down"
+                                  >
+                                    ▶
+                                  </button>
+                                )}
+                              </div>
+                              <div className="h-2" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 text-xs text-slate-400 font-sans italic border border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900/30">
+                      No supplementary media attached yet. Use the lookup tool or manually paste URLs above to populate.
+                    </div>
+                  )}
                 </div>
 
                 {/* Monetization / Sponsorship override */}
