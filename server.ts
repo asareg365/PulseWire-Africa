@@ -14,6 +14,84 @@ async function startServer() {
 
   app.use(express.json());
 
+  // --- Security Middleware Setup ---
+
+  // 1. In-memory Rate Limiting for AI Endpoints to protect against brute-force or high-bill exploits
+  const aiRequestLimits = new Map<string, { count: number; resetTime: number }>();
+  const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+  const MAX_REQUESTS_PER_WINDOW = 30; // 30 requests per minute
+
+  app.use('/api/ai/', (req, res, next) => {
+    const ip = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const limitInfo = aiRequestLimits.get(ip);
+
+    if (!limitInfo || now > limitInfo.resetTime) {
+      aiRequestLimits.set(ip, {
+        count: 1,
+        resetTime: now + RATE_LIMIT_WINDOW_MS
+      });
+      return next();
+    }
+
+    if (limitInfo.count >= MAX_REQUESTS_PER_WINDOW) {
+      console.warn(`[Security Alert] Rate limit exceeded for IP: ${ip} on ${req.originalUrl}`);
+      return res.status(429).json({
+        error: 'Too many requests. Please wait a minute before trying again to protect our AI services.'
+      });
+    }
+
+    limitInfo.count++;
+    next();
+  });
+
+  // 2. Custom Security Headers for XSS & Clickjacking Protection
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    
+    // Allow framing inside AI Studio preview but deny elsewhere in production
+    if (process.env.NODE_ENV === 'production') {
+      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    }
+    next();
+  });
+
+  // 3. Robust CORS Configuration
+  app.use((req, res, next) => {
+    const origin = req.headers.origin || '*';
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
+  // 4. Audit Logging Helper
+  function logAdminActivity(action: string, adminUser: string, details: any) {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      action,
+      adminUser,
+      details,
+      ip: details.ip || 'unknown'
+    };
+    console.log(`[AUDIT LOG] ${JSON.stringify(logEntry)}`);
+  }
+
+  // Admin audit logger endpoint
+  app.post('/api/admin/log', (req, res) => {
+    const { action, adminUser, details } = req.body;
+    const ip = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+    logAdminActivity(action || 'UNKNOWN_ACTION', adminUser || 'anonymous', { ...details, ip });
+    res.json({ success: true });
+  });
+
   // Helper to initialize Gemini SDK safely
   function getAIClient() {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -212,6 +290,192 @@ Output must be valid JSON matching this schema:
     } catch (err: any) {
       console.error('AI Originality Audit failed:', err);
       res.status(500).json({ error: err.message || 'AI Originality Audit failed' });
+    }
+  });
+
+  // 4b. AI Fact Checking Assistant
+  app.post('/api/ai/fact-check', async (req, res) => {
+    try {
+      const { title, content } = req.body;
+      if (!content) {
+        return res.status(400).json({ error: 'Content is required for fact-checking' });
+      }
+
+      const ai = getAIClient();
+      const prompt = `You are a chief fact-checker for PulseWire Africa. Analyze the following article draft's title and contents.
+Identify the core factual claims, check them for potential logical errors, historical inaccuracies, or extreme claims, and output:
+1. A list of claim evaluations: each with the claim text, a verdict ("Verified", "Disputed", "Unverified"), a clear explanation of why, and some suggested authoritative sources to verify with.
+2. An overall credibility score (0 to 100) based on factual density and potential misinformation risks.
+3. A concise fact-checking summary.
+
+Article Title: "${title || 'Untitled'}"
+Draft Content:
+${content.substring(0, 3000)}
+
+Output must be valid JSON matching this schema:
+{
+  "claimChecks": [
+    { "claim": "String", "verdict": "Verified" | "Disputed" | "Unverified", "explanation": "String", "sourcesSuggested": ["String"] }
+  ],
+  "overallCredibilityScore": Number,
+  "factCheckingSummary": "String"
+}`;
+
+      const response = await generateContentWithRetry(ai, {
+        model: 'gemini-3.5-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              claimChecks: {
+                type: 'ARRAY',
+                items: {
+                  type: 'OBJECT',
+                  properties: {
+                    claim: { type: 'STRING' },
+                    verdict: { type: 'STRING' },
+                    explanation: { type: 'STRING' },
+                    sourcesSuggested: {
+                      type: 'ARRAY',
+                      items: { type: 'STRING' }
+                    }
+                  },
+                  required: ['claim', 'verdict', 'explanation', 'sourcesSuggested']
+                }
+              },
+              overallCredibilityScore: { type: 'INTEGER' },
+              factCheckingSummary: { type: 'STRING' }
+            },
+            required: ['claimChecks', 'overallCredibilityScore', 'factCheckingSummary']
+          }
+        }
+      });
+
+      res.json(JSON.parse(response.text || '{}'));
+    } catch (err: any) {
+      console.error('AI Fact Check failed:', err);
+      res.status(500).json({ error: err.message || 'AI Fact Checking failed' });
+    }
+  });
+
+  // 4c. AI Readability, Tone & Google Discover Optimizer
+  app.post('/api/ai/readability-tone', async (req, res) => {
+    try {
+      const { content } = req.body;
+      if (!content) {
+        return res.status(400).json({ error: 'Content is required for analysis' });
+      }
+
+      const ai = getAIClient();
+      const prompt = `You are a premium digital media performance optimizer at PulseWire Africa.
+Analyze the readability, journalistic tone, and potential for high performance on Google News, Google Discover, and organic search.
+Evaluate:
+1. Reading ease score (0-100) and equivalent grade level.
+2. Tone characteristics.
+3. Content score: representing optimization for Google Discover and Google News standards (transparency, authoritative voice, no clickbait).
+4. Concrete suggested improvements.
+
+Draft Content:
+${content.substring(0, 3000)}
+
+Output must be valid JSON matching this schema:
+{
+  "readabilityLevel": "String",
+  "readingEaseScore": Number,
+  "toneAnalysis": "String",
+  "contentScore": Number,
+  "suggestedImprovements": ["String"]
+}`;
+
+      const response = await generateContentWithRetry(ai, {
+        model: 'gemini-3.5-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              readabilityLevel: { type: 'STRING' },
+              readingEaseScore: { type: 'INTEGER' },
+              toneAnalysis: { type: 'STRING' },
+              contentScore: { type: 'INTEGER' },
+              suggestedImprovements: {
+                type: 'ARRAY',
+                items: { type: 'STRING' }
+              }
+            },
+            required: ['readabilityLevel', 'readingEaseScore', 'toneAnalysis', 'contentScore', 'suggestedImprovements']
+          }
+        }
+      });
+
+      res.json(JSON.parse(response.text || '{}'));
+    } catch (err: any) {
+      console.error('AI Readability & Tone analysis failed:', err);
+      res.status(500).json({ error: err.message || 'AI analysis failed' });
+    }
+  });
+
+  // 4d. AI Social Media Caption & Newsletter Generator
+  app.post('/api/ai/social-caption', async (req, res) => {
+    try {
+      const { title, summary, content } = req.body;
+      if (!title) {
+        return res.status(400).json({ error: 'Title is required for social captions' });
+      }
+
+      const ai = getAIClient();
+      const prompt = `You are a professional digital distributor and community manager at PulseWire Africa.
+Based on the following article title, brief summary, and draft excerpt, generate:
+1. A compelling, high-engagement Facebook caption with emojis and call to actions.
+2. A punchy, viral Twitter/X thread starter under 280 characters with trending hashtags.
+3. A highly professional LinkedIn post focusing on professional insight or commercial value.
+4. A newsletter subject line and a matching introductory body text (designed to engage subscribers).
+5. A list of 5 matching, highly relevant hashtags.
+
+Article Title: "${title}"
+Summary: "${summary || ''}"
+Content Excerpt: "${(content || '').substring(0, 1000)}"
+
+Output must be valid JSON matching this schema:
+{
+  "facebookCaption": "String",
+  "twitterCaption": "String",
+  "linkedInCaption": "String",
+  "newsletterSubject": "String",
+  "newsletterBody": "String",
+  "hashtags": ["String"]
+}`;
+
+      const response = await generateContentWithRetry(ai, {
+        model: 'gemini-3.5-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              facebookCaption: { type: 'STRING' },
+              twitterCaption: { type: 'STRING' },
+              linkedInCaption: { type: 'STRING' },
+              newsletterSubject: { type: 'STRING' },
+              newsletterBody: { type: 'STRING' },
+              hashtags: {
+                type: 'ARRAY',
+                items: { type: 'STRING' }
+              }
+            },
+            required: ['facebookCaption', 'twitterCaption', 'linkedInCaption', 'newsletterSubject', 'newsletterBody', 'hashtags']
+          }
+        }
+      });
+
+      res.json(JSON.parse(response.text || '{}'));
+    } catch (err: any) {
+      console.error('AI Social distribution generation failed:', err);
+      res.status(500).json({ error: err.message || 'AI generation failed' });
     }
   });
 

@@ -210,11 +210,11 @@ export default function InfoPages({ initialPage = 'about', onNavigate }: InfoPag
                   <div className="space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-slate-100 dark:border-slate-900 rounded-xl">
                       <div className="w-12 h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center font-bold text-slate-800 dark:text-white border border-slate-200 dark:border-slate-800 text-lg">
-                        YA
+                        GA
                       </div>
                       <div className="flex-1">
                         <div className="flex items-baseline justify-between">
-                          <h4 className="font-bold text-slate-900 dark:text-white text-sm">Yeboah Asare</h4>
+                          <h4 className="font-bold text-slate-900 dark:text-white text-sm">George Oppong Asare</h4>
                           <span className="text-[10px] bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-gray-400 font-mono font-bold px-1.5 py-0.5 rounded uppercase">
                             Founder & Editor-in-Chief
                           </span>
@@ -230,17 +230,20 @@ export default function InfoPages({ initialPage = 'about', onNavigate }: InfoPag
 
                     <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-slate-100 dark:border-slate-900 rounded-xl">
                       <div className="w-12 h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center font-bold text-slate-800 dark:text-white border border-slate-200 dark:border-slate-800 text-lg">
-                        KM
+                        CA
                       </div>
                       <div className="flex-1">
                         <div className="flex items-baseline justify-between">
-                          <h4 className="font-bold text-slate-900 dark:text-white text-sm">Kwame Mensah</h4>
+                          <h4 className="font-bold text-slate-900 dark:text-white text-sm">Christian Asare-Tuah</h4>
                           <span className="text-[10px] bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-gray-400 font-mono font-bold px-1.5 py-0.5 rounded uppercase">
                             Senior Policy Correspondent
                           </span>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-gray-400 mt-1">
                           Reports on macroeconomic policy, trade agreements, and energy resources across the African continent.
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1 font-mono">
+                          casaretuah@gmail.com
                         </p>
                       </div>
                     </div>
@@ -506,7 +509,7 @@ export default function InfoPages({ initialPage = 'about', onNavigate }: InfoPag
                     2. Intellectual Property Rights
                   </h3>
                   <p className="text-xs md:text-sm leading-relaxed text-slate-500 dark:text-gray-400">
-                    All original articles, investigations, graphics, layout elements, photographs, and editorial audio summaries published on PulseWire Africa belong solely to us or our content providers and are protected by international copyright laws. Unauthorized reproduction, modification, or distribution of our materials without direct written consent from Yeboah Asare is strictly prohibited.
+                    All original articles, investigations, graphics, layout elements, photographs, and editorial audio summaries published on PulseWire Africa belong solely to us or our content providers and are protected by international copyright laws. Unauthorized reproduction, modification, or distribution of our materials without direct written consent from George Oppong Asare is strictly prohibited.
                   </p>
 
                   <h3 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">

@@ -36,7 +36,10 @@ import {
   Search,
   ExternalLink,
   Lock,
-  Database
+  Database,
+  ShieldCheck,
+  Scale,
+  Share2
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -77,6 +80,9 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const [plagiarismReport, setPlagiarismReport] = useState<{ originalityScore: number; verdict: string; analysis: string; suggestions: string[] } | null>(null);
+  const [factCheckReport, setFactCheckReport] = useState<{ claimChecks: { claim: string; verdict: string; explanation: string; sourcesSuggested: string[] }[]; overallCredibilityScore: number; factCheckingSummary: string } | null>(null);
+  const [readabilityReport, setReadabilityReport] = useState<{ readabilityLevel: string; readingEaseScore: number; toneAnalysis: string; contentScore: number; suggestedImprovements: string[] } | null>(null);
+  const [socialCaptionReport, setSocialCaptionReport] = useState<{ facebookCaption: string; twitterCaption: string; linkedInCaption: string; newsletterSubject: string; newsletterBody: string; hashtags: string[] } | null>(null);
 
   // Unsplash search for quick image select
   const [unsplashKeyword, setUnsplashKeyword] = useState('');
@@ -402,6 +408,87 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
     }
   };
 
+  const handleFactCheck = async () => {
+    if (!editorContent.trim()) {
+      setAiError('Please write some content to fact-check first.');
+      return;
+    }
+    setAiLoading(true);
+    setAiError('');
+    setFactCheckReport(null);
+    try {
+      const res = await fetch('/api/ai/fact-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: editorTitle, content: editorContent })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setFactCheckReport(data);
+      } else {
+        setAiError(data.error || 'Fact-checking failed.');
+      }
+    } catch (err) {
+      setAiError('API Connection failed.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleReadabilityTone = async () => {
+    if (!editorContent.trim()) {
+      setAiError('Please write some content to analyze first.');
+      return;
+    }
+    setAiLoading(true);
+    setAiError('');
+    setReadabilityReport(null);
+    try {
+      const res = await fetch('/api/ai/readability-tone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: editorContent })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setReadabilityReport(data);
+      } else {
+        setAiError(data.error || 'Readability & tone analysis failed.');
+      }
+    } catch (err) {
+      setAiError('API Connection failed.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleSocialCaptions = async () => {
+    if (!editorTitle.trim()) {
+      setAiError('Please enter a title to generate captions.');
+      return;
+    }
+    setAiLoading(true);
+    setAiError('');
+    setSocialCaptionReport(null);
+    try {
+      const res = await fetch('/api/ai/social-caption', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: editorTitle, summary: editorSummary, content: editorContent })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSocialCaptionReport(data);
+      } else {
+        setAiError(data.error || 'Social captions generation failed.');
+      }
+    } catch (err) {
+      setAiError('API Connection failed.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   // --- Ads mechanics ---
 
   const handleCreateAd = () => {
@@ -584,7 +671,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                       type="button"
                       onClick={handleAISummarize}
                       disabled={aiLoading}
-                      className="px-3 py-1.5 rounded bg-white dark:bg-gray-800 text-xs font-bold border border-gray-200 dark:border-gray-700 hover:border-red-500 text-gray-700 dark:text-gray-300 flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-800 text-xs font-bold border border-gray-200 dark:border-gray-700 hover:border-red-500 text-gray-700 dark:text-gray-300 flex items-center gap-1 transition-colors"
                     >
                       Summarize Draft
                     </button>
@@ -592,7 +679,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                       type="button"
                       onClick={handleAISEOAndTags}
                       disabled={aiLoading}
-                      className="px-3 py-1.5 rounded bg-white dark:bg-gray-800 text-xs font-bold border border-gray-200 dark:border-gray-700 hover:border-red-500 text-gray-700 dark:text-gray-300 flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-800 text-xs font-bold border border-gray-200 dark:border-gray-700 hover:border-red-500 text-gray-700 dark:text-gray-300 flex items-center gap-1 transition-colors"
                     >
                       Optimize SEO Headline
                     </button>
@@ -600,7 +687,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                       type="button"
                       onClick={() => handleAIRewrite('investigative')}
                       disabled={aiLoading}
-                      className="px-3 py-1.5 rounded bg-white dark:bg-gray-800 text-xs font-bold border border-gray-200 dark:border-gray-700 hover:border-red-500 text-gray-700 dark:text-gray-300 flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-800 text-xs font-bold border border-gray-200 dark:border-gray-700 hover:border-red-500 text-gray-700 dark:text-gray-300 flex items-center gap-1 transition-colors"
                     >
                       Rewrite Investigative Style
                     </button>
@@ -608,9 +695,36 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                       type="button"
                       onClick={handleDuplicateCheck}
                       disabled={aiLoading}
-                      className="px-3 py-1.5 rounded bg-red-600 text-white text-xs font-bold border border-red-600 hover:bg-red-700 flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-800 text-xs font-bold border border-gray-200 dark:border-gray-700 hover:border-red-500 text-gray-700 dark:text-gray-300 flex items-center gap-1 transition-colors"
                     >
-                      Plagiarism / Originality Check
+                      Originality Check
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={handleFactCheck}
+                      disabled={aiLoading}
+                      className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center gap-1 transition-all"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      Fact-Check Claims
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={handleReadabilityTone}
+                      disabled={aiLoading}
+                      className="px-3 py-1.5 rounded-lg bg-gray-900 hover:bg-black dark:bg-gray-100 dark:hover:bg-white text-white dark:text-black text-xs font-bold flex items-center gap-1 transition-all"
+                    >
+                      <Scale className="h-3.5 w-3.5" />
+                      Readability & Discover
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={handleSocialCaptions}
+                      disabled={aiLoading}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 transition-all"
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                      Social & Newsletter Kit
                     </button>
                   </div>
 
@@ -632,6 +746,197 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                           <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400 mt-1 pl-1 font-sans">
                             {plagiarismReport.suggestions.map((s, sIdx) => <li key={sIdx}>{s}</li>)}
                           </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Fact Checking Report Display */}
+                  {factCheckReport && (
+                    <div className="mt-4 p-4 rounded-xl bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-xs space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5 font-mono uppercase tracking-wider text-[10px]">
+                          <ShieldCheck className="h-4 w-4 text-red-600" />
+                          AI Newsroom Fact-Check Audit
+                        </span>
+                        <span className={`px-2 py-1 rounded font-bold text-[10px] uppercase font-mono ${
+                          factCheckReport.overallCredibilityScore >= 80 
+                            ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-400' 
+                            : factCheckReport.overallCredibilityScore >= 50 
+                            ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-400' 
+                            : 'bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-400'
+                        }`}>
+                          Credibility Score: {factCheckReport.overallCredibilityScore}/100
+                        </span>
+                      </div>
+                      <p className="text-gray-600 dark:text-gray-400 font-sans leading-relaxed">{factCheckReport.factCheckingSummary}</p>
+                      
+                      <div className="space-y-3">
+                        <span className="font-bold text-gray-800 dark:text-gray-200 uppercase tracking-widest text-[9px] block border-b border-gray-100 dark:border-gray-900 pb-1 font-mono">Verified Claim Analysis</span>
+                        {factCheckReport.claimChecks && factCheckReport.claimChecks.length > 0 ? (
+                          factCheckReport.claimChecks.map((check, idx) => (
+                            <div key={idx} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/60 border border-gray-150 dark:border-gray-800 space-y-1.5">
+                              <div className="flex items-start justify-between gap-2">
+                                <span className="font-bold text-gray-800 dark:text-gray-200">"{check.claim}"</span>
+                                <span className={`px-2 py-0.5 rounded font-mono font-bold uppercase text-[9px] ${
+                                  check.verdict === 'Verified' 
+                                    ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-400' 
+                                    : check.verdict === 'Disputed' 
+                                    ? 'bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-400' 
+                                    : 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-400'
+                                }`}>
+                                  {check.verdict}
+                                </span>
+                              </div>
+                              <p className="text-gray-600 dark:text-gray-400 font-sans leading-relaxed text-[11px]">{check.explanation}</p>
+                              {check.sourcesSuggested && check.sourcesSuggested.length > 0 && (
+                                <div className="text-[10px]">
+                                  <span className="font-semibold text-gray-500">Suggested Verification Sources:</span>
+                                  <span className="text-gray-600 dark:text-gray-400 font-sans pl-1">
+                                    {check.sourcesSuggested.join(', ')}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-gray-500 italic">No specific factual claims requiring evaluation were found.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Readability & Google Discover Report Display */}
+                  {readabilityReport && (
+                    <div className="mt-4 p-4 rounded-xl bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-xs space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5 font-mono uppercase tracking-wider text-[10px]">
+                          <Scale className="h-4 w-4 text-red-600" />
+                          Tone & Google Discover Optimizer
+                        </span>
+                        <span className="px-2 py-1 rounded bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-400 font-bold font-mono text-[10px] uppercase">
+                          Discover Optimization: {readabilityReport.contentScore}%
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3 pt-1">
+                        <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-150 dark:border-gray-850">
+                          <span className="text-[10px] text-gray-400 dark:text-gray-500 uppercase font-bold font-mono">Readability Level</span>
+                          <p className="font-bold text-gray-800 dark:text-gray-200 text-xs mt-0.5">{readabilityReport.readabilityLevel}</p>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-150 dark:border-gray-850">
+                          <span className="text-[10px] text-gray-400 dark:text-gray-500 uppercase font-bold font-mono">Flesch Reading Ease</span>
+                          <p className="font-bold text-gray-800 dark:text-gray-200 text-xs mt-0.5">{readabilityReport.readingEaseScore}/100</p>
+                        </div>
+                      </div>
+
+                      <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-150 dark:border-gray-850">
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500 uppercase font-bold font-mono block mb-0.5">Editorial Tone Analysis</span>
+                        <p className="text-gray-700 dark:text-gray-300 font-sans leading-relaxed">{readabilityReport.toneAnalysis}</p>
+                      </div>
+
+                      {readabilityReport.suggestedImprovements && readabilityReport.suggestedImprovements.length > 0 && (
+                        <div className="pt-1">
+                          <span className="font-bold text-gray-800 dark:text-gray-200 uppercase tracking-widest text-[9px] block border-b border-gray-100 dark:border-gray-900 pb-1 font-mono">Google News Optimization Checklist</span>
+                          <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400 mt-2 pl-1 font-sans">
+                            {readabilityReport.suggestedImprovements.map((s, idx) => <li key={idx}>{s}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Social Caption Kit Display */}
+                  {socialCaptionReport && (
+                    <div className="mt-4 p-4 rounded-xl bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-xs space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5 font-mono uppercase tracking-wider text-[10px]">
+                          <Share2 className="h-4 w-4 text-emerald-500" />
+                          AI Newsroom Distribution Kit
+                        </span>
+                        <span className="text-[10px] text-emerald-500 font-bold font-mono uppercase">Ready for Distribution</span>
+                      </div>
+
+                      {/* Facebook */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-gray-800 dark:text-gray-300 uppercase font-mono text-[9px] tracking-wider">Facebook / Instagram Copy</span>
+                          <button 
+                            type="button" 
+                            onClick={() => navigator.clipboard.writeText(socialCaptionReport.facebookCaption)}
+                            className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold uppercase"
+                          >
+                            Copy text
+                          </button>
+                        </div>
+                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 font-sans leading-relaxed text-gray-700 dark:text-gray-300 select-all whitespace-pre-wrap">
+                          {socialCaptionReport.facebookCaption}
+                        </div>
+                      </div>
+
+                      {/* Twitter */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-gray-800 dark:text-gray-300 uppercase font-mono text-[9px] tracking-wider">Twitter / X Post</span>
+                          <button 
+                            type="button" 
+                            onClick={() => navigator.clipboard.writeText(socialCaptionReport.twitterCaption)}
+                            className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold uppercase"
+                          >
+                            Copy text
+                          </button>
+                        </div>
+                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 font-sans leading-relaxed text-gray-700 dark:text-gray-300 select-all whitespace-pre-wrap">
+                          {socialCaptionReport.twitterCaption}
+                        </div>
+                      </div>
+
+                      {/* LinkedIn */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-gray-800 dark:text-gray-300 uppercase font-mono text-[9px] tracking-wider">LinkedIn Professional Share</span>
+                          <button 
+                            type="button" 
+                            onClick={() => navigator.clipboard.writeText(socialCaptionReport.linkedInCaption)}
+                            className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold uppercase"
+                          >
+                            Copy text
+                          </button>
+                        </div>
+                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 font-sans leading-relaxed text-gray-700 dark:text-gray-300 select-all whitespace-pre-wrap">
+                          {socialCaptionReport.linkedInCaption}
+                        </div>
+                      </div>
+
+                      {/* Newsletter */}
+                      <div className="space-y-1.5 p-3 rounded-lg bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-950">
+                        <span className="font-bold text-emerald-800 dark:text-emerald-400 uppercase font-mono text-[9px] tracking-wider block">PulseWire Editorial Newsletter Template</span>
+                        <div className="text-[11px] space-y-1 text-gray-700 dark:text-gray-300 font-sans">
+                          <div>
+                            <span className="font-bold text-gray-600 dark:text-gray-450">Subject:</span> {socialCaptionReport.newsletterSubject}
+                          </div>
+                          <div className="pt-1 whitespace-pre-wrap leading-relaxed border-t border-emerald-100 dark:border-emerald-900 mt-1">
+                            {socialCaptionReport.newsletterBody}
+                          </div>
+                        </div>
+                        <div className="flex justify-end pt-1">
+                          <button 
+                            type="button" 
+                            onClick={() => navigator.clipboard.writeText(`Subject: ${socialCaptionReport.newsletterSubject}\n\n${socialCaptionReport.newsletterBody}`)}
+                            className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold uppercase"
+                          >
+                            Copy Complete Template
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Hashtags */}
+                      {socialCaptionReport.hashtags && socialCaptionReport.hashtags.length > 0 && (
+                        <div>
+                          <span className="font-semibold text-gray-500">Trending Hashtags:</span>
+                          <span className="text-gray-800 dark:text-gray-300 font-mono pl-1">
+                            {socialCaptionReport.hashtags.map(h => h.startsWith('#') ? h : `#${h}`).join(' ')}
+                          </span>
                         </div>
                       )}
                     </div>

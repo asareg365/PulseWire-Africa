@@ -1,110 +1,126 @@
 {
   "entities": {
-    "Author": {
+    "author": {
       "title": "Author",
-      "description": "Profile information for a news writer/editor.",
+      "description": "User profile with role-based access control inside the newsroom.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "The unique user ID matching their Firebase Authentication UID." },
-        "name": { "type": "string", "description": "The author's full display name." },
-        "bio": { "type": "string", "description": "A short biography of the author." },
-        "avatar": { "type": "string", "description": "URL to the author's avatar image." },
-        "email": { "type": "string", "description": "The author's contact email." },
-        "role": { "type": "string", "description": "The authorization role, e.g. editor, contributor, or admin." },
-        "createdAt": { "type": "string", "format": "date-time", "description": "When the author profile was created." }
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "bio": { "type": "string" },
+        "avatar": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "editor", "contributor"] },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "name", "email", "role"]
+      "required": ["id", "name", "email", "role", "createdAt"]
     },
-    "Article": {
+    "article": {
       "title": "Article",
-      "description": "A news article, opinion piece, or editorial published on the platform.",
+      "description": "A news article with multi-category support, tags, view count, and status.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "The unique document ID for the article." },
-        "title": { "type": "string", "description": "The headline/title of the article." },
-        "slug": { "type": "string", "description": "SEO-friendly URL slug." },
-        "summary": { "type": "string", "description": "A short excerpt or summary of the article." },
-        "content": { "type": "string", "description": "The full rich-text content of the article." },
-        "featuredImage": { "type": "string", "description": "URL to the main featured image." },
-        "images": { "type": "array", "description": "List of URLs for other images used in the article." },
-        "category": { "type": "string", "description": "The primary category (e.g. Ghana, Africa, World, Sports, Football, Business, Technology, Entertainment, Health, Lifestyle)." },
-        "tags": { "type": "array", "description": "List of tags associated with the article." },
-        "authorId": { "type": "string", "description": "UID of the author who wrote the article." },
-        "authorName": { "type": "string", "description": "Name of the author." },
-        "createdAt": { "type": "string", "format": "date-time", "description": "When the article document was initially created." },
-        "updatedAt": { "type": "string", "format": "date-time", "description": "When the article was last updated." },
-        "publishedAt": { "type": "string", "format": "date-time", "description": "The scheduled or actual publication timestamp." },
-        "status": { "type": "string", "enum": ["draft", "published", "scheduled"], "description": "The workflow publication state." },
-        "views": { "type": "integer", "description": "Total view counter." },
-        "likes": { "type": "integer", "description": "Total likes counter." },
-        "isSponsored": { "type": "boolean", "description": "Whether this is sponsored brand content." },
-        "isAffiliate": { "type": "boolean", "description": "Whether this is an affiliate/monetized article." }
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "slug": { "type": "string" },
+        "summary": { "type": "string" },
+        "content": { "type": "string" },
+        "featuredImage": { "type": "string" },
+        "category": { "type": "string" },
+        "tags": { "type": "array" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "publishedAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "published", "scheduled"] },
+        "views": { "type": "number" },
+        "likes": { "type": "number" },
+        "isSponsored": { "type": "boolean" },
+        "isAffiliate": { "type": "boolean" }
       },
-      "required": ["id", "title", "slug", "content", "category", "authorId", "status", "createdAt", "updatedAt"]
+      "required": ["id", "title", "slug", "summary", "content", "category", "authorId", "createdAt", "status"]
     },
-    "Comment": {
+    "comment": {
       "title": "Comment",
-      "description": "A reader's response to an article.",
+      "description": "An article comment submitted by a logged-in user or guest.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique comment ID." },
-        "articleId": { "type": "string", "description": "ID of the target article." },
-        "authorId": { "type": "string", "description": "The commenter's UID if logged in, or 'guest'." },
-        "authorName": { "type": "string", "description": "The display name of the commenter." },
-        "authorAvatar": { "type": "string", "description": "Avatar image URL of the commenter." },
-        "content": { "type": "string", "description": "The text content of the comment." },
-        "createdAt": { "type": "string", "format": "date-time", "description": "When the comment was posted." },
-        "approved": { "type": "boolean", "description": "Whether the comment has been moderated and approved for display." }
+        "id": { "type": "string" },
+        "articleId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorAvatar": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "approved": { "type": "boolean" }
       },
       "required": ["id", "articleId", "authorName", "content", "createdAt", "approved"]
     },
-    "NewsletterSubscription": {
-      "title": "NewsletterSubscription",
-      "description": "An email subscription for news updates.",
+    "ad": {
+      "title": "Ad Placement",
+      "description": "An advertisement space for monetization tracking impressions and clicks.",
       "type": "object",
       "properties": {
-        "email": { "type": "string", "format": "email", "description": "The subscriber's email address." },
-        "subscribedAt": { "type": "string", "format": "date-time", "description": "When they subscribed." }
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["banner", "sidebar", "in-article", "sticky"] },
+        "imageUrl": { "type": "string" },
+        "link": { "type": "string" },
+        "active": { "type": "boolean" },
+        "impressions": { "type": "number" },
+        "clicks": { "type": "number" }
+      },
+      "required": ["id", "title", "type", "imageUrl", "link", "active"]
+    },
+    "newsletter": {
+      "title": "Newsletter Subscription",
+      "description": "Email address signed up for daily/weekly newsletters.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "subscribedAt": { "type": "string" }
       },
       "required": ["email", "subscribedAt"]
     },
-    "AdPlacement": {
-      "title": "AdPlacement",
-      "description": "An advertisement slot or direct sponsorship banner.",
+    "contact": {
+      "title": "Contact Message",
+      "description": "Message submitted via the contact form.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique ID for the advertisement." },
-        "title": { "type": "string", "description": "Descriptive title of the ad." },
-        "type": { "type": "string", "enum": ["banner", "sidebar", "in-article", "sticky"], "description": "Placement layout type." },
-        "imageUrl": { "type": "string", "description": "URL to the ad creative banner." },
-        "link": { "type": "string", "description": "Destination link for clicks." },
-        "active": { "type": "boolean", "description": "Whether the ad is currently active and should serve." },
-        "impressions": { "type": "integer", "description": "Number of times the ad was displayed." },
-        "clicks": { "type": "integer", "description": "Number of times the ad was clicked." }
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "submittedAt": { "type": "string" }
       },
-      "required": ["id", "title", "type", "active"]
+      "required": ["name", "email", "subject", "message", "submittedAt"]
     }
   },
   "firestore": {
     "/authors/{authorId}": {
-      "schema": "Author",
-      "description": "User profiles and author portfolios for the writing staff."
+      "schema": "author",
+      "description": "Author profiles with permissions"
     },
     "/articles/{articleId}": {
-      "schema": "Article",
-      "description": "News and commentary database containing all stories."
+      "schema": "article",
+      "description": "Published and draft stories"
     },
     "/articles/{articleId}/comments/{commentId}": {
-      "schema": "Comment",
-      "description": "Moderated discussions attached to a specific news article."
-    },
-    "/newsletter/{emailHash}": {
-      "schema": "NewsletterSubscription",
-      "description": "Mailing list for periodic bulletins and breaking news alerts."
+      "schema": "comment",
+      "description": "User feedback on articles"
     },
     "/ads/{adId}": {
-      "schema": "AdPlacement",
-      "description": "Ad slots and custom-served banner promotions."
+      "schema": "ad",
+      "description": "Advertising display entities"
+    },
+    "/newsletter/{emailHash}": {
+      "schema": "newsletter",
+      "description": "Subscribed readers"
+    },
+    "/contacts/{contactId}": {
+      "schema": "contact",
+      "description": "User queries"
     }
   }
 }
