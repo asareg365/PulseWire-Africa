@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
@@ -9,12 +8,9 @@ import dotenv from 'dotenv';
 // Load environment variables in development
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
 
@@ -305,11 +301,11 @@ Output must be valid JSON matching this schema:
     <!-- PulseWire Africa Dynamic SEO SSR -->
     <title>${articleData.title} | PulseWire Africa</title>
     <meta name="description" content="${articleData.summary.replace(/"/g, '&quot;')}" />
-    <link rel="canonical" href="${process.env.APP_URL || 'http://localhost:3000'}/article/${slug}" />
+    <link rel="canonical" href="${process.env.APP_URL || 'https://pulsewire-africa-504216611238.us-west2.run.app'}/article/${slug}" />
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="article" />
-    <meta property="og:url" content="${process.env.APP_URL || 'http://localhost:3000'}/article/${slug}" />
+    <meta property="og:url" content="${process.env.APP_URL || 'https://pulsewire-africa-504216611238.us-west2.run.app'}/article/${slug}" />
     <meta property="og:title" content="${articleData.title.replace(/"/g, '&quot;')}" />
     <meta property="og:description" content="${articleData.summary.replace(/"/g, '&quot;')}" />
     <meta property="og:image" content="${articleData.featuredImage}" />
@@ -363,7 +359,7 @@ Output must be valid JSON matching this schema:
         }
       }
 
-      const appUrl = process.env.APP_URL || 'http://localhost:3000';
+      const appUrl = process.env.APP_URL || 'https://pulsewire-africa-504216611238.us-west2.run.app';
       const categories = ['ghana', 'africa', 'world', 'sports', 'football', 'business', 'technology', 'entertainment', 'health', 'lifestyle'];
 
       let xml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -413,7 +409,7 @@ Output must be valid JSON matching this schema:
 
   // --- Dynamic Robots.txt ---
   app.get('/robots.txt', (req, res) => {
-    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const appUrl = process.env.APP_URL || 'https://pulsewire-africa-504216611238.us-west2.run.app';
     const content = `User-agent: *
 Allow: /
 Disallow: /admin
@@ -443,8 +439,8 @@ Sitemap: ${appUrl}/sitemap.xml
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`PulseWire Africa Server booted successfully on http://localhost:${PORT}`);
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT}`);
   });
 }
 
