@@ -145,7 +145,7 @@ Content:
 ${content}`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: prompt,
       });
 
@@ -183,7 +183,7 @@ Output must be valid JSON matching this schema:
 }`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -228,7 +228,7 @@ Sourced Text:
 ${content}`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: prompt,
       });
 
@@ -265,7 +265,7 @@ Output must be valid JSON matching this schema:
 }`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -322,7 +322,7 @@ Output must be valid JSON matching this schema:
 }`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -390,7 +390,7 @@ Output must be valid JSON matching this schema:
 }`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -450,7 +450,7 @@ Output must be valid JSON matching this schema:
 }`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -493,15 +493,48 @@ Output must be valid JSON matching this schema:
     try {
       // In a robust application, we would load the article from Firestore on the server.
       // To bypass loading heavy Node firebase packages on the server when doing SSR,
-      // we can query the Firestore REST API directly which is ultra-fast, zero-dependency, and extremely robust!
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/pulsewire-africa/databases/ai-studio-ce7cc083-15ac-489c-b8ff-506dc3277285/documents/articles`;
-      const response = await fetch(`${firestoreUrl}?pageSize=1&filter=${encodeURIComponent(`status = "published" and slug = "${slug}"`)}`);
+      // we can query the Firestore REST API runQuery endpoint directly which is ultra-fast, zero-dependency, and extremely robust!
+      const firestoreQueryUrl = `https://firestore.googleapis.com/v1/projects/pulsewire-africa/databases/ai-studio-ce7cc083-15ac-489c-b8ff-506dc3277285/documents:runQuery`;
+      
+      const response = await fetch(firestoreQueryUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          structuredQuery: {
+            from: [{ collectionId: 'articles' }],
+            where: {
+              compositeFilter: {
+                op: 'AND',
+                filters: [
+                  {
+                    fieldFilter: {
+                      field: { fieldPath: 'slug' },
+                      op: 'EQUAL',
+                      value: { stringValue: slug }
+                    }
+                  },
+                  {
+                    fieldFilter: {
+                      field: { fieldPath: 'status' },
+                      op: 'EQUAL',
+                      value: { stringValue: 'published' }
+                    }
+                  }
+                ]
+              }
+            },
+            limit: 1
+          }
+        })
+      });
       
       let articleData: any = null;
       if (response.ok) {
-        const data: any = await response.json();
-        if (data && data.documents && data.documents.length > 0) {
-          const doc = data.documents[0];
+        const queryResults: any = await response.json();
+        if (Array.isArray(queryResults) && queryResults.length > 0 && queryResults[0].document) {
+          const doc = queryResults[0].document;
           const fields = doc.fields || {};
           articleData = {
             title: fields.title?.stringValue || 'PulseWire Africa Story',
@@ -528,14 +561,22 @@ Output must be valid JSON matching this schema:
 
       // Get appropriate index.html path
       const indexHtmlPath = process.env.NODE_ENV === 'production' 
-        ? path.join(process.cwd(), 'dist', 'index.html') 
-        : path.join(process.cwd(), 'index.html');
+         ? path.join(process.cwd(), 'dist', 'index.html') 
+         : path.join(process.cwd(), 'index.html');
 
       if (!fs.existsSync(indexHtmlPath)) {
         return next();
       }
 
       let html = fs.readFileSync(indexHtmlPath, 'utf8');
+
+      // Strip existing title and meta tags that we are going to dynamically override
+      html = html.replace(/<title>[\s\S]*?<\/title>/gi, '');
+      html = html.replace(/<meta\s+name="title"[\s\S]*?\/>/gi, '');
+      html = html.replace(/<meta\s+name="description"[\s\S]*?\/>/gi, '');
+      html = html.replace(/<meta\s+property="og:[\s\S]*?\/>/gi, '');
+      html = html.replace(/<meta\s+property="twitter:[\s\S]*?\/>/gi, '');
+      html = html.replace(/<meta\s+name="twitter:[\s\S]*?\/>/gi, '');
 
       // Structured Schema Markup
       const schemaMarkup = {
@@ -604,7 +645,7 @@ Output must be valid JSON matching this schema:
   // --- Dynamic XML Sitemap ---
   app.get('/sitemap.xml', async (req, res) => {
     try {
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/gen-lang-client-0971604910/databases/ai-studio-ce7cc083-15ac-489c-b8ff-506dc3277285/documents/articles?pageSize=100`;
+      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/pulsewire-africa/databases/ai-studio-ce7cc083-15ac-489c-b8ff-506dc3277285/documents/articles?pageSize=100`;
       const response = await fetch(firestoreUrl);
       let articles: any[] = [];
       

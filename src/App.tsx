@@ -399,18 +399,6 @@ export default function App() {
   // Seed database and load initial configurations
   useEffect(() => {
     async function initDB() {
-      // If the database has not been cleared once as requested, do so now
-      if (!localStorage.getItem('database_cleared_once')) {
-        console.log('User requested removing all pre-loaded data. Clearing database...');
-        try {
-          await clearAllDatabaseData();
-          localStorage.setItem('skip_seeding', 'true');
-          localStorage.setItem('database_cleared_once', 'true');
-        } catch (err) {
-          console.error('Failed to clear database on startup:', err);
-        }
-      }
-
       await seedDatabaseIfEmpty();
       
       // Check if Gemini API is configured

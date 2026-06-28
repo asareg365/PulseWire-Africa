@@ -194,15 +194,16 @@ export async function getAllArticles(includeDrafts = false): Promise<Article[]> 
   const path = 'articles';
   try {
     const colRef = collection(db, path);
-    let q;
-    if (includeDrafts) {
-      q = query(colRef, orderBy('createdAt', 'desc'));
-    } else {
-      q = query(colRef, where('status', '==', 'published'), orderBy('createdAt', 'desc'));
-    }
-    
+    // Use single-field query to avoid composite index requirements
+    const q = query(colRef, orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.data() as Article);
+    const docs = snapshot.docs.map(doc => doc.data() as Article);
+    
+    if (includeDrafts) {
+      return docs;
+    } else {
+      return docs.filter(art => art.status === 'published');
+    }
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, path);
   }
@@ -213,14 +214,12 @@ export async function getArticlesByCategory(category: string): Promise<Article[]
   const path = 'articles';
   try {
     const colRef = collection(db, path);
-    const q = query(
-      colRef, 
-      where('status', '==', 'published'), 
-      orderBy('createdAt', 'desc')
-    );
+    // Use single-field query to avoid composite index requirements
+    const q = query(colRef, orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
     const list = snapshot.docs.map(doc => doc.data() as Article);
     return list.filter(art => {
+      if (art.status !== 'published') return false;
       const cats = art.categories && art.categories.length > 0 ? art.categories : [art.category];
       return cats.some(c => c.toLowerCase() === category.toLowerCase());
     });
