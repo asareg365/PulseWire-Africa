@@ -23,6 +23,7 @@ import AdSenseBanner from './components/AdSenseBanner';
 import ArticleComments from './components/ArticleComments';
 import AdminDashboard from './components/AdminDashboard';
 import InfoPages from './components/InfoPages';
+import AuthorBioCard from './components/AuthorBioCard';
 import { 
   BookOpen, 
   Calendar, 
@@ -53,6 +54,17 @@ import {
   Mail,
   X
 } from 'lucide-react';
+
+export function getAuthorAvatar(authorName: string): string {
+  const name = (authorName || '').toLowerCase();
+  if (name.includes('george') || name.includes('asare') || name.includes('chief') || name.includes('editor')) {
+    return "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=256&h=256&q=80";
+  }
+  if (name.includes('christian') || name.includes('tuah')) {
+    return "https://images.unsplash.com/photo-1531384441138-2736e62e0919?auto=format&fit=crop&w=256&h=256&q=80";
+  }
+  return "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80";
+}
 
 export default function App() {
   // Navigation & Routing state
@@ -142,7 +154,7 @@ export default function App() {
         setIsAdmin(true);
         navigate('/admin');
       } else {
-        setIsAdmin(true); // Default to true for testing workspace convenience as seen in Header.tsx
+        setIsAdmin(false);
         navigate('/');
       }
     } catch (err: any) {
@@ -157,14 +169,6 @@ export default function App() {
     } finally {
       setAuthLoading(false);
     }
-  };
-
-  const handleBypassSignIn = () => {
-    const simUser = { email: 'admin@pulsewire.com', displayName: 'Simulated Contributor' };
-    sessionStorage.setItem('pulsewire_simulated_user', JSON.stringify(simUser));
-    setIsAdmin(true);
-    navigate('/admin');
-    window.location.reload();
   };
 
   // Articles & DB state
@@ -778,14 +782,24 @@ export default function App() {
                         </div>
 
                         {/* Direct AdSense sidebar placement */}
-                        <AdSenseBanner type="sidebar" />
+                        <AdSenseBanner 
+                          type="sidebar" 
+                          contextTitle={articles[0]?.title}
+                          contextCategory={articles[0]?.category}
+                          contextTags={articles[0]?.tags}
+                        />
                       </div>
 
                     </div>
                   )}
 
                   {/* Horizontal Banner ad placement */}
-                  <AdSenseBanner type="banner" />
+                  <AdSenseBanner 
+                    type="banner" 
+                    contextTitle={articles[0]?.title}
+                    contextCategory={articles[0]?.category}
+                    contextTags={articles[0]?.tags}
+                  />
 
                   {/* Secondary grid articles */}
                   {articles.length > 1 && (
@@ -908,7 +922,12 @@ export default function App() {
 
                     {/* Right Column: Mini Sidebar */}
                     <div className="space-y-6">
-                      <AdSenseBanner type="sidebar" />
+                      <AdSenseBanner 
+                        type="sidebar" 
+                        contextTitle={articles[0]?.title}
+                        contextCategory={articles[0]?.category}
+                        contextTags={articles[0]?.tags}
+                      />
                     </div>
 
                   </div>
@@ -1000,7 +1019,7 @@ export default function App() {
                       <div className="flex items-center justify-between border-y border-gray-100 dark:border-gray-900 py-3.5">
                         <div className="flex items-center space-x-3">
                           <img 
-                            src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80" 
+                            src={getAuthorAvatar(selectedArticle.authorName)} 
                             alt={selectedArticle.authorName} 
                             referrerPolicy="no-referrer"
                             className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-800" 
@@ -1287,6 +1306,12 @@ export default function App() {
                       </div>
                     )}
 
+                    {/* Author Biography Card */}
+                    <AuthorBioCard 
+                      authorName={selectedArticle.authorName} 
+                      onSearchAuthor={(name) => navigate(`/search?q=${encodeURIComponent(name)}`)} 
+                    />
+
                     {/* Tags and Likes */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-gray-100 dark:border-gray-900 pt-6 mt-8">
                       <div className="flex flex-wrap gap-2">
@@ -1452,7 +1477,12 @@ export default function App() {
 
                   {/* Right Sidebar details (1 col wide) */}
                   <div className="space-y-6">
-                    <AdSenseBanner type="sidebar" />
+                    <AdSenseBanner 
+                      type="sidebar" 
+                      contextTitle={selectedArticle.title}
+                      contextCategory={selectedArticle.category}
+                      contextTags={selectedArticle.tags}
+                    />
                   </div>
 
                 </div>
@@ -1673,25 +1703,6 @@ export default function App() {
                       Google Account
                     </button>
 
-                    <div className="pt-4 border-t border-slate-100 dark:border-gray-800 space-y-3">
-                      <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/30 rounded-xl space-y-2">
-                        <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-400 font-bold text-[10px] uppercase tracking-wider font-mono">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                          Developer Bypass Mode
-                        </div>
-                        <p className="text-[10px] text-slate-500 dark:text-gray-400 leading-normal">
-                          If you receive a <code className="bg-slate-100 dark:bg-gray-900 px-1 py-0.5 rounded text-rose-600 font-bold">Firebase (auth/operation-not-allowed)</code> error, it means Email/Password or Google providers are not enabled yet in your Firebase console. Use this simulator to login instantly.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={handleBypassSignIn}
-                          className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
-                        >
-                          Simulate Contributor Sign In
-                        </button>
-                      </div>
-                    </div>
-
                     <div className="text-center pt-4 border-t border-slate-100 dark:border-gray-800 text-xs">
                       <span className="text-slate-500 dark:text-gray-400">
                         {isSignUp ? 'Already have an account?' : 'Need contributor credentials?'}
@@ -1724,7 +1735,12 @@ export default function App() {
       </main>
 
       {/* Dynamic Sticky footer ad panel */}
-      <AdSenseBanner type="sticky" />
+      <AdSenseBanner 
+        type="sticky" 
+        contextTitle={selectedArticle?.title || articles[0]?.title}
+        contextCategory={selectedArticle?.category || articles[0]?.category}
+        contextTags={selectedArticle?.tags || articles[0]?.tags}
+      />
 
       {/* Main Footer */}
       <Footer navigate={navigate} />

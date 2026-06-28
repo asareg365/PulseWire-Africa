@@ -209,8 +209,13 @@ export default function InfoPages({ initialPage = 'about', onNavigate }: InfoPag
                   </h3>
                   <div className="space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-slate-100 dark:border-slate-900 rounded-xl">
-                      <div className="w-12 h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center font-bold text-slate-800 dark:text-white border border-slate-200 dark:border-slate-800 text-lg">
-                        GA
+                      <div className="w-12 h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center font-bold text-slate-800 dark:text-white border border-slate-200 dark:border-slate-800 text-lg overflow-hidden shrink-0">
+                        <img 
+                          src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80" 
+                          alt="George Oppong Asare" 
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-baseline justify-between">
@@ -229,8 +234,13 @@ export default function InfoPages({ initialPage = 'about', onNavigate }: InfoPag
                     </div>
 
                     <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-slate-100 dark:border-slate-900 rounded-xl">
-                      <div className="w-12 h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center font-bold text-slate-800 dark:text-white border border-slate-200 dark:border-slate-800 text-lg">
-                        CA
+                      <div className="w-12 h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center font-bold text-slate-800 dark:text-white border border-slate-200 dark:border-slate-800 text-lg overflow-hidden shrink-0">
+                        <img 
+                          src="https://images.unsplash.com/photo-1531384441138-2736e62e0919?auto=format&fit=crop&w=120&h=120&q=80" 
+                          alt="Christian Asare-Tuah" 
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-baseline justify-between">

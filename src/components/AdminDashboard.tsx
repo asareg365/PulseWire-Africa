@@ -39,8 +39,11 @@ import {
   Database,
   ShieldCheck,
   Scale,
-  Share2
+  Share2,
+  Upload,
+  Crop
 } from 'lucide-react';
+import ImageEditorOverlay from './ImageEditorOverlay';
 
 interface AdminDashboardProps {
   navigate: (path: string) => void;
@@ -96,6 +99,43 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
   const [adImageUrl, setAdImageUrl] = useState('');
   const [adLink, setAdLink] = useState('');
   const [adActive, setAdActive] = useState(true);
+
+  // Image Editor Overlay states
+  const [imageEditorOpen, setImageEditorOpen] = useState(false);
+  const [imageToEdit, setImageToEdit] = useState('');
+  const [activeImageTarget, setActiveImageTarget] = useState<'cover' | 'ad' | 'gallery'>('cover');
+
+  const processImageFile = (file: File, onComplete: (url: string) => void) => {
+    if (file.size > 2.5 * 1024 * 1024) {
+      alert("Please select an image smaller than 2.5MB to ensure safe storage in the database.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (typeof event.target?.result === 'string') {
+        onComplete(event.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadAndEdit = (file: File, target: 'cover' | 'ad' | 'gallery') => {
+    if (file.size > 2.5 * 1024 * 1024) {
+      alert("Please select an image smaller than 2.5MB to ensure safe storage in the database.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (typeof event.target?.result === 'string') {
+        setImageToEdit(event.target.result);
+        setActiveImageTarget(target);
+        setImageEditorOpen(true);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     loadAllAdminData();
@@ -1068,9 +1108,83 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                       type="text" 
                       value={editorFeaturedImage}
                       onChange={e => setEditorFeaturedImage(e.target.value)}
-                      className="w-full p-2 rounded bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-xs text-gray-900 dark:text-white"
+                      className="w-full p-2 rounded bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-xs text-gray-900 dark:text-white mb-3"
                     />
                   </div>
+
+                  {/* Drag and Drop Zone */}
+                  <div 
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) {
+                        handleUploadAndEdit(file, 'cover');
+                      }
+                    }}
+                    onClick={() => {
+                      document.getElementById('cover-file-upload')?.click();
+                    }}
+                    className="border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-emerald-500 rounded-lg p-5 text-center cursor-pointer transition-all bg-white dark:bg-gray-900 relative overflow-hidden group min-h-[100px] flex flex-col justify-center items-center"
+                  >
+                    {editorFeaturedImage ? (
+                      <>
+                        <img 
+                          src={editorFeaturedImage} 
+                          alt="Cover Preview" 
+                          className="absolute inset-0 w-full h-full object-cover opacity-20 dark:opacity-40 group-hover:opacity-10 transition-opacity" 
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="relative z-10 flex flex-col items-center">
+                          <Upload className="mx-auto h-5 w-5 text-emerald-600 mb-1 animate-bounce" />
+                          <p className="text-[11px] text-gray-700 dark:text-gray-300 font-bold">
+                            Drag & Drop to replace or <span className="text-emerald-600 underline">Browse</span>
+                          </p>
+                          <p className="text-[9px] text-gray-400 mt-0.5">Cover photo is loaded</p>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="relative z-10 flex flex-col items-center">
+                        <Upload className="mx-auto h-5 w-5 text-gray-400 mb-1" />
+                        <p className="text-[11px] text-gray-500 font-semibold">
+                          Drag & Drop Cover Photo or <span className="text-emerald-600">Browse</span>
+                        </p>
+                        <p className="text-[9px] text-gray-400 mt-0.5">Supports PNG, JPG, GIF up to 2.5MB</p>
+                      </div>
+                    )}
+                    <input 
+                      type="file" 
+                      id="cover-file-upload" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleUploadAndEdit(file, 'cover');
+                        }
+                      }}
+                    />
+                  </div>
+
+                  {editorFeaturedImage && (
+                    <button
+                      type="button"
+                      id="btn-edit-cover-photo"
+                      onClick={() => {
+                        setImageToEdit(editorFeaturedImage);
+                        setActiveImageTarget('cover');
+                        setImageEditorOpen(true);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 py-2 px-3 border border-emerald-200 dark:border-emerald-800 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 font-bold text-xs hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-800 transition-all shadow-sm font-sans"
+                    >
+                      <Crop className="h-4 w-4 text-emerald-600" />
+                      Crop / Adjust Framing & Filters
+                    </button>
+                  )}
 
                   {/* Asset lookup helper */}
                   <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
@@ -1138,7 +1252,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                   {/* Manual add input */}
                   <div>
                     <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Add Image URL manually</label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mb-3">
                       <input 
                         type="text" 
                         id="manual-gallery-img"
@@ -1170,6 +1284,44 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                       >
                         Attach
                       </button>
+                    </div>
+
+                    {/* Drag and Drop Gallery Zone */}
+                    <div 
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const file = e.dataTransfer.files?.[0];
+                        if (file) {
+                          handleUploadAndEdit(file, 'gallery');
+                        }
+                      }}
+                      onClick={() => {
+                        document.getElementById('gallery-file-upload')?.click();
+                      }}
+                      className="border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-emerald-500 rounded-lg p-4 text-center cursor-pointer transition-all bg-white dark:bg-gray-900 flex flex-col justify-center items-center"
+                    >
+                      <Upload className="h-5 w-5 text-emerald-600 mb-1 animate-pulse" />
+                      <p className="text-[10px] text-gray-500 font-semibold">
+                        Drag & Drop photos here or <span className="text-emerald-600 underline">Browse</span> to upload from device
+                      </p>
+                      <p className="text-[8px] text-gray-400 mt-0.5">Adds instantly to the attached media gallery (up to 2.5MB)</p>
+                      <input 
+                        type="file" 
+                        id="gallery-file-upload" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleUploadAndEdit(file, 'gallery');
+                          }
+                        }}
+                      />
                     </div>
                   </div>
 
@@ -1363,8 +1515,80 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                   placeholder="https://images.unsplash.com/photo-..."
                   value={adImageUrl}
                   onChange={e => setAdImageUrl(e.target.value)}
-                  className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white"
+                  className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white mb-2"
                 />
+
+                {/* Drag and Drop Zone */}
+                <div 
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) {
+                      handleUploadAndEdit(file, 'ad');
+                    }
+                  }}
+                  onClick={() => {
+                    document.getElementById('ad-file-upload')?.click();
+                  }}
+                  className="border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-emerald-500 rounded-lg p-3 text-center cursor-pointer transition-all bg-gray-50 dark:bg-gray-950 relative overflow-hidden group min-h-[80px] flex flex-col justify-center items-center"
+                >
+                  {adImageUrl ? (
+                    <>
+                      <img 
+                        src={adImageUrl} 
+                        alt="Ad Preview" 
+                        className="absolute inset-0 w-full h-full object-cover opacity-20 dark:opacity-40 group-hover:opacity-10 transition-opacity" 
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="relative z-10">
+                        <Upload className="mx-auto h-4 w-4 text-emerald-600 mb-0.5 animate-pulse" />
+                        <p className="text-[10px] text-gray-700 dark:text-gray-300 font-bold">
+                          Drag & Drop to replace or <span className="text-emerald-600 underline">Browse</span>
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="relative z-10">
+                      <Upload className="mx-auto h-4 w-4 text-gray-400 mb-0.5" />
+                      <p className="text-[10px] text-gray-500 font-semibold">
+                        Drag & Drop Banner Photo or <span className="text-emerald-600">Browse</span>
+                      </p>
+                    </div>
+                  )}
+                  <input 
+                    type="file" 
+                    id="ad-file-upload" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleUploadAndEdit(file, 'ad');
+                      }
+                    }}
+                  />
+                </div>
+
+                {adImageUrl && (
+                  <button
+                    type="button"
+                    id="btn-edit-ad-photo"
+                    onClick={() => {
+                      setImageToEdit(adImageUrl);
+                      setActiveImageTarget('ad');
+                      setImageEditorOpen(true);
+                    }}
+                    className="mt-2 w-full flex items-center justify-center gap-1.5 py-1.5 px-3 border border-emerald-200 dark:border-emerald-800 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 font-bold text-[10px] hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-800 transition-all font-sans"
+                  >
+                    <Crop className="h-3.5 w-3.5 text-emerald-600" />
+                    Adjust Framing & Filters
+                  </button>
+                )}
               </div>
 
               <div>
@@ -1911,6 +2135,29 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
 
         </div>
       )}
+
+      <ImageEditorOverlay
+        isOpen={imageEditorOpen}
+        imageSrc={imageToEdit}
+        onClose={() => {
+          setImageEditorOpen(false);
+          setImageToEdit('');
+        }}
+        onSave={(editedImage) => {
+          if (activeImageTarget === 'cover') {
+            setEditorFeaturedImage(editedImage);
+          } else if (activeImageTarget === 'ad') {
+            setAdImageUrl(editedImage);
+          } else if (activeImageTarget === 'gallery') {
+            if (!editorImages.includes(editedImage)) {
+              setEditorImages([...editorImages, editedImage]);
+            }
+          }
+          setImageEditorOpen(false);
+          setImageToEdit('');
+        }}
+        title={activeImageTarget === 'cover' ? "Adjust Cover Photo Framing & Filters" : "Adjust Image Framing & Filters"}
+      />
 
     </div>
   );

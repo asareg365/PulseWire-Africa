@@ -94,7 +94,10 @@ async function startServer() {
 
   // Helper to initialize Gemini SDK safely
   function getAIClient() {
-    const apiKey = process.env.GEMINI_API_KEY;
+    let apiKey = process.env.GEMINI_API_KEY;
+    if (apiKey) {
+      apiKey = apiKey.trim().replace(/^["']|["']$/g, '');
+    }
     if (!apiKey || apiKey === 'MY_GEMINI_API_KEY' || apiKey.trim() === '') {
       throw new Error('GEMINI_API_KEY environment variable is not configured. Please add it via AI Studio settings.');
     }
@@ -418,7 +421,7 @@ Output must be valid JSON matching this schema:
     }
   });
 
-  // 4d. AI Social Media Caption & Newsletter Generator
+  // AI Social Media Caption & Newsletter Generator
   app.post('/api/ai/social-caption', async (req, res) => {
     try {
       const { title, summary, content } = req.body;
@@ -479,9 +482,151 @@ Output must be valid JSON matching this schema:
     }
   });
 
+  // 4e. AI Dynamic Content-Driven Sponsored Ad Generator
+  app.post('/api/ai/ads/generate', async (req, res) => {
+    try {
+      const { title = '', category = '', tags = [], type = 'sidebar' } = req.body;
+      
+      const ai = getAIClient();
+      const prompt = `You are a creative advertising strategist for PulseWire Africa.
+Analyze the following webpage/article context and generate a highly relevant, contextually driven sponsored ad.
+
+Webpage Context:
+- Title: "${title}"
+- Category: "${category}"
+- Tags: "${tags.join(', ')}"
+- Placement: "${type}"
+
+Generate a realistic, high-quality, professional sponsored advertisement related to this context. Avoid generic placeholder text or low-quality phrasing.
+
+Select an appropriate, high-quality, professional Unsplash image that fits the ad's theme.
+The image URL MUST be a real, valid, public Unsplash image. Provide a high-quality photo that matches the topic perfectly from these curated professional patterns:
+- Tech/Business/Fintech: Use a dashboard, workspace, code, or modern office imagery.
+  Examples: 
+  - "https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=600&q=80"
+  - "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=600&q=80"
+  - "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=600&q=80"
+  - "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=600&q=80"
+- Sports/Athletics/Health: Use running, stadium, soccer, or workout imagery.
+  Examples:
+  - "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=600&q=80"
+  - "https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=600&q=80"
+  - "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?auto=format&fit=crop&w=600&q=80"
+- Finance/Banking/Investments: Use currency, charts, cryptocurrency, or gold imagery.
+  Examples:
+  - "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=600&q=80"
+  - "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=600&q=80"
+- Lifestyle/Real Estate/Travel: Use planes, beaches, modern houses, or food imagery.
+  Examples:
+  - "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80"
+  - "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=600&q=80"
+- Politics/Global Affairs/Education: Use books, libraries, globes, or newspapers.
+  Examples:
+  - "https://images.unsplash.com/photo-1495020689067-958852a6565d?auto=format&fit=crop&w=600&q=80"
+  - "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=600&q=80"
+
+If none of those match, choose another realistic high-resolution Unsplash photo URL.
+
+Output must be a valid JSON object matching this schema:
+{
+  "title": "A highly punchy, appealing, creative headline for the ad under 8 words (e.g. 'Scale Your Business Across Africa')",
+  "advertiser": "The name of the simulated brand or sponsor (e.g. 'Standard Bank Group')",
+  "description": "An engaging, professional, persuasive 1-2 sentence description detailing the benefits or offer.",
+  "link": "A realistic simulated destination URL (e.g. 'https://standardbank.com/africa-growth')",
+  "ctaText": "A quick action verb (e.g. 'Get Started', 'Learn More', 'Sign Up', 'Explore Now')",
+  "imageUrl": "The complete valid Unsplash image URL starting with https://images.unsplash.com/...",
+  "themeColor": "A Tailwind CSS color palette name suitable for the brand (e.g. 'emerald', 'sky', 'indigo', 'amber', 'rose', 'teal')"
+}
+`;
+
+      const response = await generateContentWithRetry(ai, {
+        model: 'gemini-2.5-flash-lite',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              title: { type: 'STRING' },
+              advertiser: { type: 'STRING' },
+              description: { type: 'STRING' },
+              link: { type: 'STRING' },
+              ctaText: { type: 'STRING' },
+              imageUrl: { type: 'STRING' },
+              themeColor: { type: 'STRING' }
+            },
+            required: ['title', 'advertiser', 'description', 'link', 'ctaText', 'imageUrl', 'themeColor']
+          }
+        }
+      });
+
+      res.json(JSON.parse(response.text || '{}'));
+    } catch (err: any) {
+      console.warn('AI Ad Generation failed or API Key missing. Returning fallback ad:', err.message);
+      // Fallback dynamic ads based on Category
+      const category = (req.body.category || '').toLowerCase();
+      let fallbackAd = {
+        title: 'Premium Financial Solutions for Africa',
+        advertiser: 'Standard Chartered Africa',
+        description: 'Grow and secure your wealth with our tailored wealth management and checking accounts across West Africa.',
+        link: 'https://sc.com/africa',
+        ctaText: 'Learn More',
+        imageUrl: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=600&q=80',
+        themeColor: 'emerald'
+      };
+
+      if (category.includes('tech') || category.includes('startups') || category.includes('digital') || category.includes('software')) {
+        fallbackAd = {
+          title: 'Accept Payments Anywhere on Earth',
+          advertiser: 'Paystack Africa',
+          description: 'Modern, secure payment APIs designed for startups, small businesses, and enterprise platforms across Nigeria, Ghana, and Kenya.',
+          link: 'https://paystack.com',
+          ctaText: 'Get Started',
+          imageUrl: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=600&q=80',
+          themeColor: 'sky'
+        };
+      } else if (category.includes('sport') || category.includes('football')) {
+        fallbackAd = {
+          title: 'Premium Sportswear & Training Kits',
+          advertiser: 'Puma Sports West Africa',
+          description: 'Step up your speed and agility on the field with Puma premium running gear and custom athletic sportswear. Free delivery in Accra & Lagos.',
+          link: 'https://puma.com',
+          ctaText: 'Shop Now',
+          imageUrl: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=600&q=80',
+          themeColor: 'amber'
+        };
+      } else if (category.includes('lifestyle') || category.includes('entertainment') || category.includes('travel')) {
+        fallbackAd = {
+          title: 'Fly Accra to London with Virgin',
+          advertiser: 'Virgin Atlantic Airways',
+          description: 'Experience ultra-premium economy seats, luxury pre-flight lounges, and top-tier hospitality on daily direct flights between Accra and London.',
+          link: 'https://virginatlantic.com',
+          ctaText: 'Book Flight',
+          imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
+          themeColor: 'rose'
+        };
+      } else if (category.includes('politics') || category.includes('business') || category.includes('economy')) {
+        fallbackAd = {
+          title: 'Insights into Emerging African Markets',
+          advertiser: 'McKinsey & Company Africa',
+          description: 'Unlock exclusive market trends, strategic corporate advice, and macro-economic research designed for corporate leadership in West Africa.',
+          link: 'https://mckinsey.com',
+          ctaText: 'Explore Research',
+          imageUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=600&q=80',
+          themeColor: 'indigo'
+        };
+      }
+
+      res.json(fallbackAd);
+    }
+  });
+
   // 5. Check if Gemini API is available
   app.get('/api/ai/status', (req, res) => {
-    const apiKey = process.env.GEMINI_API_KEY;
+    let apiKey = process.env.GEMINI_API_KEY;
+    if (apiKey) {
+      apiKey = apiKey.trim().replace(/^["']|["']$/g, '');
+    }
     const isConfigured = !!apiKey && apiKey !== 'MY_GEMINI_API_KEY' && apiKey.trim() !== '';
     res.json({ configured: isConfigured });
   });
@@ -505,24 +650,10 @@ Output must be valid JSON matching this schema:
           structuredQuery: {
             from: [{ collectionId: 'articles' }],
             where: {
-              compositeFilter: {
-                op: 'AND',
-                filters: [
-                  {
-                    fieldFilter: {
-                      field: { fieldPath: 'slug' },
-                      op: 'EQUAL',
-                      value: { stringValue: slug }
-                    }
-                  },
-                  {
-                    fieldFilter: {
-                      field: { fieldPath: 'status' },
-                      op: 'EQUAL',
-                      value: { stringValue: 'published' }
-                    }
-                  }
-                ]
+              fieldFilter: {
+                field: { fieldPath: 'slug' },
+                op: 'EQUAL',
+                value: { stringValue: slug }
               }
             },
             limit: 1

@@ -46,48 +46,30 @@ export default function Header({
   onSearch
 }: HeaderProps) {
   const [user, setUser] = useState<User | null>(null);
-  const [simulatedUser, setSimulatedUser] = useState<{ email: string; displayName: string } | null>(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    // Check if there is a simulated user in sessionStorage
-    const sim = sessionStorage.getItem('pulsewire_simulated_user');
-    if (sim) {
-      try {
-        const parsed = JSON.parse(sim);
-        setSimulatedUser(parsed);
-        setIsAdmin(true);
-      } catch (e) {}
-    }
-
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        // Automatically make asareg365@gmail.com or any authenticated test user an admin for easy testing!
+        // Automatically make asareg365@gmail.com or any authenticated test user an admin
         if (currentUser.email === 'asareg365@gmail.com' || currentUser.email?.endsWith('@pulsewire.com') || currentUser.email === 'admin@pulsewire.com') {
           setIsAdmin(true);
         } else {
-          // Default to true for testing workspace convenience so the user can see admin capabilities immediately
-          setIsAdmin(true);
-        }
-      } else {
-        // If there's a simulated user, keep admin privileges, otherwise clear
-        const hasSim = sessionStorage.getItem('pulsewire_simulated_user');
-        if (!hasSim) {
           setIsAdmin(false);
         }
+      } else {
+        setIsAdmin(false);
       }
     });
     return unsubscribe;
   }, [setIsAdmin]);
 
-  const activeUser = user || simulatedUser;
+  const activeUser = user;
 
   const handleSignOut = async () => {
-    sessionStorage.removeItem('pulsewire_simulated_user');
-    setSimulatedUser(null);
     await signOut(auth);
     setIsAdmin(false);
     navigate('/');
@@ -103,7 +85,8 @@ export default function Header({
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-950/95 backdrop-blur-md transition-colors duration-200">
+    <>
+      <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-950/95 backdrop-blur-md transition-colors duration-200">
       {/* Top bar for Branding & Actions */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
@@ -289,82 +272,85 @@ export default function Header({
         </div>
       )}
 
-      {/* Mobile Menu Slide-Out Drawer */}
-      {showMobileMenu && (
-        <div className="fixed inset-0 top-16 z-40 bg-gray-950/50 backdrop-blur-sm md:hidden" onClick={() => setShowMobileMenu(false)}>
-          <div 
-            className="w-4/5 max-w-sm h-full bg-white dark:bg-gray-950 p-6 flex flex-col space-y-6 shadow-2xl transition-transform duration-300"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {isAdmin && (
-              <button 
-                onClick={() => { navigate('/admin'); setShowMobileMenu(false); }}
-                className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 font-bold uppercase text-xs tracking-wider"
-              >
-                <Lock className="h-4 w-4" />
-                Go to Admin Dashboard
-              </button>
-            )}
-
-            <div className="flex flex-col space-y-2">
-              <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest font-mono">Categories</span>
-              <button 
-                onClick={() => { navigate('/'); setShowMobileMenu(false); }}
-                className={`text-left py-2 px-3 rounded-lg font-medium text-sm ${currentPath === '/' ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-900'}`}
-              >
-                Home
-              </button>
-              <button 
-                onClick={() => { navigate('/saved'); setShowMobileMenu(false); }}
-                className={`text-left py-2 px-3 rounded-lg font-medium text-sm flex items-center gap-2 ${currentPath === '/saved' ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-900'}`}
-              >
-                <Bookmark className="h-4 w-4 text-emerald-700" />
-                My Saved
-              </button>
-              {CATEGORIES.map(cat => (
-                <button 
-                  key={cat.id}
-                  onClick={() => { navigate(`/category/${cat.id}`); setShowMobileMenu(false); }}
-                  className={`text-left py-2 px-3 rounded-lg font-medium text-sm ${currentPath === `/category/${cat.id}` ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-900'}`}
-                >
-                  {cat.name}
-                </button>
-              ))}
-            </div>
-
-            {activeUser ? (
-              <div className="border-t border-slate-100 dark:border-gray-900 pt-4 flex flex-col space-y-2">
-                <div className="flex items-center space-x-3 px-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold">
-                    {activeUser.displayName?.[0] || activeUser.email?.[0]?.toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-slate-900 dark:text-white">{activeUser.displayName || 'Contributor'}</div>
-                    <div className="text-xs text-slate-500 dark:text-gray-400 truncate max-w-[200px]">{activeUser.email}</div>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => { handleSignOut(); setShowMobileMenu(false); }}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 rounded-lg text-left"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Sign Out
-                </button>
-              </div>
-            ) : (
-              <div className="border-t border-slate-100 dark:border-gray-900 pt-4 flex flex-col space-y-2">
-                <button 
-                  onClick={() => { navigate('/login'); setShowMobileMenu(false); }}
-                  className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg bg-emerald-700 text-white hover:bg-emerald-800 font-bold uppercase text-xs tracking-wider transition-colors shadow-md shadow-emerald-700/10"
-                >
-                  <UserIcon className="h-4 w-4" />
-                  Sign In
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </header>
+    
+    {/* Mobile Menu Slide-Out Drawer - placed outside sticky header to fix stacking and transparency rendering issues on mobile */}
+    {showMobileMenu && (
+      <div className="fixed inset-0 top-16 z-[100] bg-gray-950/60 backdrop-blur-sm md:hidden" onClick={() => setShowMobileMenu(false)}>
+        <div 
+          className="w-4/5 max-w-sm h-full bg-white opacity-100 dark:bg-gray-950 dark:opacity-100 p-6 flex flex-col space-y-6 shadow-2xl transition-transform duration-300 relative z-[101]"
+          onClick={(e) => e.stopPropagation()}
+          id="mobile-drawer-content"
+        >
+          {isAdmin && (
+            <button 
+              onClick={() => { navigate('/admin'); setShowMobileMenu(false); }}
+              className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 font-bold uppercase text-xs tracking-wider"
+            >
+              <Lock className="h-4 w-4" />
+              Go to Admin Dashboard
+            </button>
+          )}
+
+          <div className="flex flex-col space-y-2">
+            <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest font-mono">Categories</span>
+            <button 
+              onClick={() => { navigate('/'); setShowMobileMenu(false); }}
+              className={`text-left py-2 px-3 rounded-lg font-medium text-sm ${currentPath === '/' ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-900'}`}
+            >
+              Home
+            </button>
+            <button 
+              onClick={() => { navigate('/saved'); setShowMobileMenu(false); }}
+              className={`text-left py-2 px-3 rounded-lg font-medium text-sm flex items-center gap-2 ${currentPath === '/saved' ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-900'}`}
+            >
+              <Bookmark className="h-4 w-4 text-emerald-700" />
+              My Saved
+            </button>
+            {CATEGORIES.map(cat => (
+              <button 
+                key={cat.id}
+                onClick={() => { navigate(`/category/${cat.id}`); setShowMobileMenu(false); }}
+                className={`text-left py-2 px-3 rounded-lg font-medium text-sm ${currentPath === `/category/${cat.id}` ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-900'}`}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+
+          {activeUser ? (
+            <div className="border-t border-slate-100 dark:border-gray-900 pt-4 flex flex-col space-y-2">
+              <div className="flex items-center space-x-3 px-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold">
+                  {activeUser.displayName?.[0] || activeUser.email?.[0]?.toUpperCase()}
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white">{activeUser.displayName || 'Contributor'}</div>
+                  <div className="text-xs text-slate-500 dark:text-gray-400 truncate max-w-[200px]">{activeUser.email}</div>
+                </div>
+              </div>
+              <button 
+                onClick={() => { handleSignOut(); setShowMobileMenu(false); }}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 rounded-lg text-left"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <div className="border-t border-slate-100 dark:border-gray-900 pt-4 flex flex-col space-y-2">
+              <button 
+                onClick={() => { navigate('/login'); setShowMobileMenu(false); }}
+                className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg bg-emerald-700 text-white hover:bg-emerald-800 font-bold uppercase text-xs tracking-wider transition-colors shadow-md shadow-emerald-700/10"
+              >
+                <UserIcon className="h-4 w-4" />
+                Sign In
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+    </>
   );
 }
