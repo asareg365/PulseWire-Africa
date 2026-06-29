@@ -14,8 +14,8 @@ import {
   increment 
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
-import { Article, Comment, AdPlacement, NewsletterSubscription, ContactMessage } from '../types';
-import { SEED_ARTICLES, SEED_ADS } from './seedData';
+import { Article, Comment, AdPlacement, NewsletterSubscription, ContactMessage, Author } from '../types';
+import { SEED_ARTICLES, SEED_ADS, SEED_AUTHORS } from './seedData';
 
 // Firestore error handling types and function
 export enum OperationType {
@@ -74,6 +74,11 @@ export async function seedDatabaseIfEmpty(force = false) {
       return;
     }
 
+    if (!force && localStorage.getItem('pulsewire_db_seeded') === 'true') {
+      console.log('Auto-seeding skipped. Database already seeded previously.');
+      return;
+    }
+
     const articlesCol = collection(db, pathForArticles);
     const qSnapshot = await getDocs(query(articlesCol, limit(1)));
     
@@ -95,6 +100,15 @@ export async function seedDatabaseIfEmpty(force = false) {
           await setDoc(doc(db, 'ads', ad.id), cleanUndefined(ad));
         } catch (err) {
           handleFirestoreError(err, OperationType.WRITE, `ads/${ad.id}`);
+        }
+      }
+
+      // Seed Authors
+      for (const authObj of SEED_AUTHORS) {
+        try {
+          await setDoc(doc(db, 'authors', authObj.id), cleanUndefined(authObj));
+        } catch (err) {
+          handleFirestoreError(err, OperationType.WRITE, `authors/${authObj.id}`);
         }
       }
 
@@ -142,6 +156,9 @@ export async function seedDatabaseIfEmpty(force = false) {
       
       console.log('Seeding completed successfully!');
     }
+    
+    // Save state to avoid future queries on refresh
+    localStorage.setItem('pulsewire_db_seeded', 'true');
   } catch (error) {
     console.error('Error seeding Firestore:', error);
     handleFirestoreError(error, OperationType.LIST, pathForArticles);
@@ -178,6 +195,13 @@ export async function clearAllDatabaseData(): Promise<void> {
     const newsSnapshot = await getDocs(newsCol);
     for (const d of newsSnapshot.docs) {
       await deleteDoc(doc(db, 'newsletter', d.id));
+    }
+
+    // 4. Delete all authors
+    const authorsCol = collection(db, 'authors');
+    const authorsSnapshot = await getDocs(authorsCol);
+    for (const d of authorsSnapshot.docs) {
+      await deleteDoc(doc(db, 'authors', d.id));
     }
 
     console.log('All database data cleared successfully!');
@@ -504,6 +528,56 @@ export async function submitContactMessage(msg: ContactMessage): Promise<void> {
     await addDoc(colRef, msg);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+// ---------------- Authors / User Profiles ----------------
+
+// Fetch all authors/user profiles
+export async function getAllAuthors(): Promise<Author[]> {
+  const path = 'authors';
+  try {
+    const colRef = collection(db, path);
+    const snapshot = await getDocs(colRef);
+    return snapshot.docs.map(doc => doc.data() as Author);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+    return [];
+  }
+}
+
+// Fetch single author profile by ID
+export async function getAuthorById(authorId: string): Promise<Author | null> {
+  const path = `authors/${authorId}`;
+  try {
+    const docRef = doc(db, 'authors', authorId);
+    const snapshot = await getDoc(docRef);
+    if (!snapshot.exists()) return null;
+    return snapshot.data() as Author;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+    return null;
+  }
+}
+
+// Save or edit author profile
+export async function saveAuthor(author: Author): Promise<void> {
+  const path = `authors/${author.id}`;
+  try {
+    const docRef = doc(db, 'authors', author.id);
+    await setDoc(docRef, cleanUndefined(author));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+// Delete author profile
+export async function deleteAuthor(authorId: string): Promise<void> {
+  const path = `authors/${authorId}`;
+  try {
+    await deleteDoc(doc(db, 'authors', authorId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
 

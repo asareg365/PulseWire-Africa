@@ -200,8 +200,8 @@ export default function Footer({ navigate }: FooterProps) {
           </p>
           <div className="text-xs text-slate-500 dark:text-gray-400 space-y-1">
             <p><strong>Hotline:</strong> +233 248472474</p>
-            <p><strong>Editorial:</strong> editor@pulsewire.com</p>
-            <p><strong>General:</strong> info@pulsewire.com</p>
+            <p><strong>Editorial:</strong> editor@pulsewireafrica.news</p>
+            <p><strong>General:</strong> info@pulsewireafrica.news</p>
             <p><strong>Support:</strong> asareg365@gmail.com</p>
           </div>
         </div>

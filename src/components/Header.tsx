@@ -23,8 +23,9 @@ import {
   Activity,
   Bookmark
 } from 'lucide-react';
-import { CATEGORIES } from '../types';
+import { CATEGORIES, Author } from '../types';
 import Logo from './Logo';
+import { getAllAuthors, saveAuthor } from '../lib/db';
 
 interface HeaderProps {
   currentPath: string;
@@ -55,7 +56,7 @@ export default function Header({
       setUser(currentUser);
       if (currentUser) {
         // Automatically make asareg365@gmail.com or any authenticated test user an admin
-        if (currentUser.email === 'asareg365@gmail.com' || currentUser.email?.endsWith('@pulsewire.com') || currentUser.email === 'admin@pulsewire.com') {
+        if (currentUser.email === 'asareg365@gmail.com' || currentUser.email?.endsWith('@pulsewireafrica.news') || currentUser.email === 'admin@pulsewireafrica.news') {
           setIsAdmin(true);
         } else {
           setIsAdmin(false);
@@ -81,6 +82,96 @@ export default function Header({
       onSearch(searchQuery.trim());
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
       setSearchOpen(false);
+    }
+  };
+
+  // Self-managed bureau profile states
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [authorProfile, setAuthorProfile] = useState<Author | null>(null);
+  const [profileName, setProfileName] = useState('');
+  const [profileBio, setProfileBio] = useState('');
+  const [profileAvatar, setProfileAvatar] = useState('');
+  const [profileTwitter, setProfileTwitter] = useState('');
+  const [profileLinkedin, setProfileLinkedin] = useState('');
+  const [profilePassword, setProfilePassword] = useState('');
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState('');
+  const [saveError, setSaveError] = useState('');
+
+  useEffect(() => {
+    if (showProfileModal && activeUser && activeUser.email) {
+      setLoadingProfile(true);
+      setSaveSuccess('');
+      setSaveError('');
+      getAllAuthors()
+        .then(authorsList => {
+          const matched = authorsList.find(a => a.email.toLowerCase() === activeUser.email!.toLowerCase());
+          if (matched) {
+            setAuthorProfile(matched);
+            setProfileName(matched.name || '');
+            setProfileBio(matched.bio || '');
+            setProfileAvatar(matched.avatar || '');
+            setProfileTwitter(matched.twitter || '');
+            setProfileLinkedin(matched.linkedin || '');
+            setProfilePassword(matched.password || '');
+          } else {
+            const newProfile: Author = {
+              id: `author-${Date.now()}`,
+              name: activeUser.displayName || activeUser.email!.split('@')[0],
+              bio: '',
+              avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&h=256&q=80',
+              email: activeUser.email!,
+              role: 'contributor',
+              createdAt: new Date().toISOString(),
+              twitter: '',
+              linkedin: '',
+              password: ''
+            };
+            setAuthorProfile(newProfile);
+            setProfileName(newProfile.name);
+            setProfileBio('');
+            setProfileAvatar(newProfile.avatar);
+            setProfileTwitter('');
+            setProfileLinkedin('');
+            setProfilePassword('');
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          setSaveError('Failed to load profile details.');
+        })
+        .finally(() => {
+          setLoadingProfile(false);
+        });
+    }
+  }, [showProfileModal, activeUser]);
+
+  const handleSaveOwnProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authorProfile) return;
+    setLoadingProfile(true);
+    setSaveSuccess('');
+    setSaveError('');
+    
+    const updated: Author = {
+      ...authorProfile,
+      name: profileName.trim(),
+      bio: profileBio.trim(),
+      avatar: profileAvatar.trim(),
+      twitter: profileTwitter.trim(),
+      linkedin: profileLinkedin.trim(),
+      password: profilePassword.trim()
+    };
+
+    try {
+      await saveAuthor(updated);
+      setSaveSuccess('Your bureau profile and login details have been updated!');
+      setAuthorProfile(updated);
+      setTimeout(() => setShowProfileModal(false), 2000);
+    } catch (err: any) {
+      setSaveError(err.message || 'Failed to save profile changes.');
+    } finally {
+      setLoadingProfile(false);
     }
   };
 
@@ -185,12 +276,16 @@ export default function Header({
           {/* User Sign In / Account Dropdown */}
           {activeUser ? (
             <div className="flex items-center space-x-2">
-              <div className="hidden lg:flex flex-col text-right">
-                <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate max-w-[120px]">
+              <button 
+                onClick={() => setShowProfileModal(true)}
+                className="hidden lg:flex flex-col text-right hover:opacity-80 transition-opacity focus:outline-none"
+                title="Edit My Bureau Profile"
+              >
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[120px] underline decoration-emerald-500/30 decoration-wavy">
                   {activeUser.displayName || activeUser.email?.split('@')[0]}
                 </span>
-                <span className="text-[9px] text-slate-400 font-mono -mt-0.5 font-bold uppercase text-[8px] tracking-wider text-emerald-700 dark:text-emerald-400">Contributor</span>
-              </div>
+                <span className="text-[9px] text-slate-400 font-mono -mt-0.5 font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">My Profile ⚙️</span>
+              </button>
               <button 
                 onClick={handleSignOut}
                 className="p-2 rounded-lg text-slate-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
@@ -347,6 +442,134 @@ export default function Header({
                 Sign In
               </button>
             </div>
+          )}
+        </div>
+      </div>
+    )}
+
+    {/* Self-managed Profile Modal */}
+    {showProfileModal && (
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-950/60 backdrop-blur-sm p-4 flex items-center justify-center">
+        <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 shadow-2xl relative">
+          <button 
+            onClick={() => setShowProfileModal(false)}
+            className="absolute top-4 right-4 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">My Bureau Profile & Login</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Add or update your professional details and password credentials below.</p>
+
+          {loadingProfile ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mb-2"></div>
+              <p className="text-xs text-slate-500 font-mono">Synchronizing profile...</p>
+            </div>
+          ) : (
+            <form onSubmit={handleSaveOwnProfile} className="space-y-4">
+              {saveSuccess && (
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-400 rounded-lg text-xs font-mono">
+                  {saveSuccess}
+                </div>
+              )}
+              {saveError && (
+                <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-400 rounded-lg text-xs font-mono">
+                  {saveError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Professional Full Name</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="e.g. Ama Serwaa"
+                  value={profileName}
+                  onChange={e => setProfileName(e.target.value)}
+                  className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Email (Read-Only)</label>
+                  <input 
+                    type="email" 
+                    disabled
+                    value={activeUser?.email || ''}
+                    className="w-full p-2.5 rounded bg-gray-100 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-400 dark:text-gray-600 cursor-not-allowed"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Login Password</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. securePass123"
+                    value={profilePassword}
+                    onChange={e => setProfilePassword(e.target.value)}
+                    className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Avatar Image URL</label>
+                <input 
+                  type="text" 
+                  placeholder="https://images.unsplash.com/photo-..."
+                  value={profileAvatar}
+                  onChange={e => setProfileAvatar(e.target.value)}
+                  className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Professional Bio</label>
+                <textarea 
+                  rows={3}
+                  required
+                  placeholder="Tell readers about your background, track record, and coverage beats..."
+                  value={profileBio}
+                  onChange={e => setProfileBio(e.target.value)}
+                  className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Twitter Handle (no @)</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. AmaSerwaaTech"
+                    value={profileTwitter}
+                    onChange={e => setProfileTwitter(e.target.value)}
+                    className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">LinkedIn Username/ID</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. ama-serwaa"
+                    value={profileLinkedin}
+                    onChange={e => setProfileLinkedin(e.target.value)}
+                    className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button 
+                  type="submit" 
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md shadow-emerald-600/10"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
           )}
         </div>
       </div>

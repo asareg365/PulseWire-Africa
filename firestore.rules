@@ -18,26 +18,44 @@ service cloud.firestore {
 
     // Helper to query user roles from the authors collection
     function getUserData() {
-      return get(/databases/$(database)/documents/authors/$(request.auth.uid)).data;
+      return exists(/databases/$(database)/documents/authors/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/authors/$(request.auth.uid)).data
+        : get(/databases/$(database)/documents/authors/$(request.auth.token.email)).data;
     }
 
     function isAuthorRole(role) {
-      return isSignedIn() && exists(/databases/$(database)/documents/authors/$(request.auth.uid)) && getUserData().role == role;
+      return isSignedIn() && (
+        (exists(/databases/$(database)/documents/authors/$(request.auth.uid)) && get(/databases/$(database)/documents/authors/$(request.auth.uid)).data.role == role) ||
+        (exists(/databases/$(database)/documents/authors/$(request.auth.token.email)) && get(/databases/$(database)/documents/authors/$(request.auth.token.email)).data.role == role)
+      );
+    }
+
+    function isAdminEmail() {
+      return isSignedIn() && (
+        request.auth.token.email == 'asareg365@gmail.com' ||
+        request.auth.token.email == 'admin@pulsewireafrica.news' ||
+        request.auth.token.email.matches('.*@pulsewireafrica\\.news$')
+      );
+    }
+
+    function isAdmin() {
+      return isAdminEmail() || isAuthorRole('admin');
     }
 
     function isEditorOrAdmin() {
-      return isAuthorRole('admin') || isAuthorRole('editor');
+      return isAdminEmail() || isAuthorRole('admin') || isAuthorRole('editor');
     }
 
     // --- 1. Authors collection ---
     match /authors/{authorId} {
       allow read: if true;
-      // Allow creation during signup, or updates by profile owner (blocking role changes by non-admins)
-      allow create: if isSignedIn() && request.resource.data.role == 'contributor';
-      allow update: if isOwner(authorId) && (
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) || isAuthorRole('admin')
-      );
-      allow delete: if isAuthorRole('admin');
+      // Allow creation during signup, or by admin
+      allow create: if isAdmin() || (isSignedIn() && request.resource.data.role == 'contributor');
+      // Allow update if admin, or if owner of profile without changing their role
+      allow update: if isAdmin() || (isOwner(authorId) && (
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) || isAdmin()
+      ));
+      allow delete: if isAdmin();
     }
 
     // --- 2. Articles collection ---

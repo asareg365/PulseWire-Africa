@@ -150,7 +150,7 @@ export default function App() {
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
-      if (result.user && (result.user.email === 'asareg365@gmail.com' || result.user.email?.endsWith('@pulsewire.com') || result.user.email === 'admin@pulsewire.com')) {
+      if (result.user && (result.user.email === 'asareg365@gmail.com' || result.user.email?.endsWith('@pulsewireafrica.news') || result.user.email === 'admin@pulsewireafrica.news')) {
         setIsAdmin(true);
         navigate('/admin');
       } else {
@@ -177,6 +177,7 @@ export default function App() {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [categoryArticles, setCategoryArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dbReady, setDbReady] = useState(false);
 
   // Saved articles state
   const [savedSlugs, setSavedSlugs] = useState<string[]>(() => {
@@ -403,18 +404,25 @@ export default function App() {
   // Seed database and load initial configurations
   useEffect(() => {
     async function initDB() {
-      await seedDatabaseIfEmpty();
-      
-      // Check if Gemini API is configured
       try {
-        const res = await fetch('/api/ai/status');
-        const data = await res.json();
-        setAiConfigured(data.configured);
-      } catch (err) {
-        console.error('Failed to check AI configuration:', err);
-      }
+        await seedDatabaseIfEmpty();
+        
+        // Check if Gemini API is configured
+        try {
+          const res = await fetch('/api/ai/status');
+          const data = await res.json();
+          setAiConfigured(data.configured);
+        } catch (err) {
+          console.error('Failed to check AI configuration:', err);
+        }
 
-      await loadPrimaryContent();
+        await loadPrimaryContent();
+      } catch (err) {
+        console.error('Error initializing database:', err);
+      } finally {
+        setDbReady(true);
+        setLoading(false);
+      }
     }
     initDB();
   }, []);
@@ -682,16 +690,102 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         <AnimatePresence mode="wait">
-          {loading ? (
+          {!dbReady || loading ? (
             <motion.div 
-              key="loading"
+              key="skeleton-loader"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center py-32"
+              className="space-y-12 py-4"
             >
-              <div className="h-12 w-12 border-4 border-emerald-700 border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest font-mono">Dissecting stories...</p>
+              {/* Featured Section Skeleton (Desktop: 2 columns, Mobile: 1 column) */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Hero / Big Featured Article Skeleton */}
+                <div className="lg:col-span-2 space-y-4">
+                  {/* Aspect Ratio Box for Image */}
+                  <div className="aspect-[16/9] w-full rounded-2xl bg-slate-200/70 dark:bg-slate-900/60 animate-pulse" />
+                  
+                  {/* Category Pill Skeleton */}
+                  <div className="h-5 w-24 bg-slate-200/70 dark:bg-slate-900/60 rounded-full animate-pulse" />
+                  
+                  {/* Title Skeleton */}
+                  <div className="space-y-2">
+                    <div className="h-7 w-5/6 bg-slate-200/70 dark:bg-slate-900/60 rounded animate-pulse" />
+                    <div className="h-7 w-1/2 bg-slate-200/70 dark:bg-slate-900/60 rounded animate-pulse" />
+                  </div>
+                  
+                  {/* Excerpt Skeleton */}
+                  <div className="space-y-1.5 pt-2">
+                    <div className="h-4 w-full bg-slate-200/50 dark:bg-slate-900/40 rounded animate-pulse" />
+                    <div className="h-4 w-full bg-slate-200/50 dark:bg-slate-900/40 rounded animate-pulse" />
+                    <div className="h-4 w-2/3 bg-slate-200/50 dark:bg-slate-900/40 rounded animate-pulse" />
+                  </div>
+                  
+                  {/* Author / Date Skeleton */}
+                  <div className="flex items-center gap-3 pt-4">
+                    <div className="w-8 h-8 rounded-full bg-slate-200/70 dark:bg-slate-900/60 animate-pulse" />
+                    <div className="space-y-1">
+                      <div className="h-3 w-28 bg-slate-200/70 dark:bg-slate-900/60 rounded animate-pulse" />
+                      <div className="h-3 w-16 bg-slate-200/50 dark:bg-slate-900/40 rounded animate-pulse" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Popular / Sidebar Section Skeleton */}
+                <div className="space-y-6">
+                  <div className="border-b border-slate-100 dark:border-slate-900 pb-3 flex items-center justify-between">
+                    <div className="h-5 w-32 bg-slate-200/70 dark:bg-slate-900/60 rounded animate-pulse" />
+                    <div className="h-4 w-12 bg-slate-200/50 dark:bg-slate-900/40 rounded animate-pulse" />
+                  </div>
+                  
+                  <div className="space-y-6">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="flex gap-4 items-start">
+                        {/* Big Rank Number Skeleton */}
+                        <div className="text-3xl font-extrabold text-slate-100 dark:text-slate-900 select-none leading-none animate-pulse">
+                          0{i}
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          {/* Mini Category tag */}
+                          <div className="h-3 w-16 bg-slate-200/50 dark:bg-slate-900/40 rounded animate-pulse" />
+                          {/* Title lines */}
+                          <div className="h-4 w-full bg-slate-200/70 dark:bg-slate-900/60 rounded animate-pulse" />
+                          <div className="h-4 w-4/5 bg-slate-200/70 dark:bg-slate-900/60 rounded animate-pulse" />
+                          {/* Views metadata */}
+                          <div className="h-3.5 w-24 bg-slate-200/50 dark:bg-slate-900/40 rounded animate-pulse mt-1" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid 2: Three Column Feed Skeleton */}
+              <div className="space-y-6 pt-8 border-t border-slate-100 dark:border-slate-900">
+                <div className="h-5 w-48 bg-slate-200/70 dark:bg-slate-900/60 rounded animate-pulse" />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="space-y-3">
+                      {/* Grid Image */}
+                      <div className="aspect-[16/10] w-full rounded-2xl bg-slate-200/70 dark:bg-slate-900/60 animate-pulse" />
+                      {/* Pill */}
+                      <div className="h-4.5 w-20 bg-slate-200/50 dark:bg-slate-900/40 rounded-full animate-pulse" />
+                      {/* Title */}
+                      <div className="space-y-1.5">
+                        <div className="h-5 w-full bg-slate-200/70 dark:bg-slate-900/60 rounded animate-pulse" />
+                        <div className="h-5 w-5/6 bg-slate-200/70 dark:bg-slate-900/60 rounded animate-pulse" />
+                      </div>
+                      {/* Summary */}
+                      <div className="space-y-1 pt-1">
+                        <div className="h-3.5 w-full bg-slate-200/50 dark:bg-slate-900/40 rounded animate-pulse" />
+                        <div className="h-3.5 w-3/4 bg-slate-200/50 dark:bg-slate-900/40 rounded animate-pulse" />
+                      </div>
+                      {/* Author */}
+                      <div className="h-3 w-32 bg-slate-200/50 dark:bg-slate-900/40 rounded animate-pulse pt-2" />
+                    </div>
+                  ))}
+                </div>
+              </div>
             </motion.div>
           ) : (
             <motion.div

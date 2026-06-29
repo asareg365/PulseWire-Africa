@@ -1,4 +1,4 @@
-import { Article, AdPlacement } from '../types';
+import { Article, AdPlacement, Author } from '../types';
 
 export const SEED_ARTICLES: Article[] = [
   {
@@ -174,5 +174,60 @@ export const SEED_ADS: AdPlacement[] = [
     active: true,
     impressions: 180,
     clicks: 12
+  }
+];
+
+export const SEED_AUTHORS: Author[] = [
+  {
+    id: "george-oppong-asare",
+    name: "George Oppong Asare",
+    role: "Founder & Chief Editor",
+    bio: "George Oppong Asare oversees all editorial operations, deep-dive investigations, and strategic bureau expansion across West Africa. He is a seasoned investigative journalist with over a decade of experience tracking economic development, public governance, and trade infrastructure on the continent.",
+    avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=256&h=256&q=80",
+    email: "editor@pulsewireafrica.news",
+    createdAt: "2026-06-21T09:00:00Z",
+    twitter: "GeorgeAsarePW",
+    linkedin: "george-oppong-asare"
+  },
+  {
+    id: "christian-asare-tuah",
+    name: "Christian Asare-Tuah",
+    role: "Chief Administrator & Lead Editor",
+    bio: "Christian manages day-to-day operations, editorial standards, and newsroom workflows. An expert in regional economic integration and development models, he ensures PulseWire's reporting remains hyper-factual, highly contextualized, and fully independent.",
+    avatar: "https://images.unsplash.com/photo-1531384441138-2736e62e0919?auto=format&fit=crop&w=256&h=256&q=80",
+    email: "admin@pulsewireafrica.news",
+    createdAt: "2026-06-21T09:00:00Z",
+    twitter: "CAT_PulseWire",
+    linkedin: "christian-asare-tuah"
+  },
+  {
+    id: "pulsewire-staff-1",
+    name: "Ama Serwaa",
+    role: "Senior Tech & Business Correspondent",
+    bio: "Ama reports on tech ecosystems, financial inclusion, and the startup landscape redefining West and East African commerce. With a background in financial economics, her columns analyze how digital technologies bypass traditional market barriers.",
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80",
+    email: "ama.serwaa@pulsewireafrica.news",
+    createdAt: "2026-06-21T09:00:00Z",
+    twitter: "AmaSerwaaTech"
+  },
+  {
+    id: "pulsewire-staff-2",
+    name: "Kofi Owusu",
+    role: "Regional Politics & Governance Analyst",
+    bio: "Kofi focuses on democratic transitions, election integrity, and multilateral diplomatic relationships within the ECOWAS and African Union blocs. He has covered multiple historic elections and specializes in constitutional reform policy.",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=256&h=256&q=80",
+    email: "kofi.owusu@pulsewireafrica.news",
+    createdAt: "2026-06-21T09:00:00Z",
+    twitter: "KofiOwusuGov"
+  },
+  {
+    id: "pulsewire-staff-3",
+    name: "Abidemi Babangida",
+    role: "Investigative Reporter & Energy Correspondent",
+    bio: "Abidemi leads investigative coverage on climate policy, infrastructure funding, oil & gas concessions, and the green transition in sub-Saharan Africa. She is a recipient of several journalism awards for environmental reporting.",
+    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=256&h=256&q=80",
+    email: "abidemi.b@pulsewireafrica.news",
+    createdAt: "2026-06-21T09:00:00Z",
+    twitter: "AbidemiEnergy"
   }
 ];

@@ -21,8 +21,8 @@ import {
   Clock,
   ExternalLink
 } from 'lucide-react';
-import { submitContactMessage } from '../lib/db';
-import { ContactMessage } from '../types';
+import { submitContactMessage, getAllAuthors } from '../lib/db';
+import { ContactMessage, Author } from '../types';
 
 interface InfoPagesProps {
   initialPage?: 'about' | 'contact' | 'privacy' | 'terms' | 'editorial' | 'fact-check' | 'cookie';
@@ -54,6 +54,24 @@ export default function InfoPages({ initialPage = 'about', onNavigate }: InfoPag
   const [contactMsg, setContactMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+
+  // Authors/Team State
+  const [authors, setAuthors] = useState<Author[]>([]);
+  const [loadingAuthors, setLoadingAuthors] = useState(true);
+
+  useEffect(() => {
+    async function fetchAuthors() {
+      try {
+        const list = await getAllAuthors();
+        setAuthors(list);
+      } catch (err) {
+        console.error('Failed to load authors:', err);
+      } finally {
+        setLoadingAuthors(false);
+      }
+    }
+    fetchAuthors();
+  }, []);
 
   // Cookie Preference State
   const [cookieConsent, setCookieConsent] = useState({
@@ -208,55 +226,77 @@ export default function InfoPages({ initialPage = 'about', onNavigate }: InfoPag
                     Meet Our Leadership Team
                   </h3>
                   <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-slate-100 dark:border-slate-900 rounded-xl">
-                      <div className="w-12 h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center font-bold text-slate-800 dark:text-white border border-slate-200 dark:border-slate-800 text-lg overflow-hidden shrink-0">
-                        <img 
-                          src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80" 
-                          alt="George Oppong Asare" 
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
+                    {loadingAuthors ? (
+                      <div className="space-y-4">
+                        {[1, 2].map(i => (
+                          <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-slate-100 dark:border-slate-900 rounded-xl animate-pulse">
+                            <div className="w-12 h-12 bg-slate-200 dark:bg-slate-800 rounded-full shrink-0" />
+                            <div className="flex-1 space-y-2">
+                              <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/3" />
+                              <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded w-2/3" />
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-baseline justify-between">
-                          <h4 className="font-bold text-slate-900 dark:text-white text-sm">George Oppong Asare</h4>
-                          <span className="text-[10px] bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-gray-400 font-mono font-bold px-1.5 py-0.5 rounded uppercase">
-                            Founder & Editor-in-Chief
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500 dark:text-gray-400 mt-1">
-                          Oversees all editorial outputs and strategic growth across West Africa. Over a decade of investigative journalism experience.
-                        </p>
-                        <p className="text-xs text-slate-400 mt-1 font-mono">
-                          asareg365@gmail.com
-                        </p>
-                      </div>
-                    </div>
+                    ) : (
+                      (() => {
+                        const fallbackAuthors: Author[] = [
+                          {
+                            id: 'george-oppong-asare',
+                            name: 'George Oppong Asare',
+                            role: 'Founder & Editor-in-Chief',
+                            bio: 'Oversees all editorial outputs and strategic growth across West Africa. Over a decade of investigative journalism experience.',
+                            avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80',
+                            email: 'asareg365@gmail.com',
+                            createdAt: ''
+                          },
+                          {
+                            id: 'christian-asare-tuah',
+                            name: 'Christian Asare-Tuah',
+                            role: 'Senior Policy Correspondent',
+                            bio: 'Reports on macroeconomic policy, trade agreements, and energy resources across the African continent.',
+                            avatar: 'https://images.unsplash.com/photo-1531384441138-2736e62e0919?auto=format&fit=crop&w=120&h=120&q=80',
+                            email: 'casaretuah@gmail.com',
+                            createdAt: ''
+                          }
+                        ];
 
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-slate-100 dark:border-slate-900 rounded-xl">
-                      <div className="w-12 h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center font-bold text-slate-800 dark:text-white border border-slate-200 dark:border-slate-800 text-lg overflow-hidden shrink-0">
-                        <img 
-                          src="https://images.unsplash.com/photo-1531384441138-2736e62e0919?auto=format&fit=crop&w=120&h=120&q=80" 
-                          alt="Christian Asare-Tuah" 
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-baseline justify-between">
-                          <h4 className="font-bold text-slate-900 dark:text-white text-sm">Christian Asare-Tuah</h4>
-                          <span className="text-[10px] bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-gray-400 font-mono font-bold px-1.5 py-0.5 rounded uppercase">
-                            Senior Policy Correspondent
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500 dark:text-gray-400 mt-1">
-                          Reports on macroeconomic policy, trade agreements, and energy resources across the African continent.
-                        </p>
-                        <p className="text-xs text-slate-400 mt-1 font-mono">
-                          casaretuah@gmail.com
-                        </p>
-                      </div>
-                    </div>
+                        const displayAuthors = authors.length > 0 ? authors : fallbackAuthors;
+
+                        return displayAuthors.map((author) => (
+                          <div key={author.id} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-slate-100 dark:border-slate-900 rounded-xl bg-white dark:bg-slate-950/40">
+                            <div className="w-12 h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center font-bold text-slate-800 dark:text-white border border-slate-200 dark:border-slate-800 text-lg overflow-hidden shrink-0">
+                              {author.avatar ? (
+                                <img 
+                                  src={author.avatar} 
+                                  alt={author.name} 
+                                  className="w-full h-full object-cover"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                author.name.charAt(0)
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                                <h4 className="font-bold text-slate-900 dark:text-white text-sm">{author.name}</h4>
+                                <span className="text-[10px] bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-gray-400 font-mono font-bold px-1.5 py-0.5 rounded uppercase">
+                                  {author.role}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 dark:text-gray-400 mt-1">
+                                {author.bio || 'No bio provided.'}
+                              </p>
+                              {author.email && (
+                                <p className="text-xs text-slate-400 mt-1 font-mono">
+                                  {author.email}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ));
+                      })()
+                    )}
                   </div>
                 </div>
               )}
@@ -298,8 +338,8 @@ export default function InfoPages({ initialPage = 'about', onNavigate }: InfoPag
                           <div>
                             <span className="text-[10px] font-mono font-bold uppercase text-slate-400 block">General & Editorial inquiries</span>
                             <div className="space-y-0.5">
-                              <a href="mailto:editor@pulsewire.com" className="text-sm font-bold text-slate-900 dark:text-white hover:underline block">
-                                editor@pulsewire.com
+                              <a href="mailto:editor@pulsewireafrica.news" className="text-sm font-bold text-slate-900 dark:text-white hover:underline block">
+                                editor@pulsewireafrica.news
                               </a>
                               <a href="mailto:asareg365@gmail.com" className="text-sm font-bold text-emerald-600 dark:text-emerald-400 hover:underline block">
                                 asareg365@gmail.com

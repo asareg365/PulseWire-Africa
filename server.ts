@@ -116,12 +116,17 @@ async function startServer() {
     try {
       return await ai.models.generateContent(params);
     } catch (err: any) {
-      const isTransient = err.message?.includes('503') || 
-                          err.message?.includes('UNAVAILABLE') || 
-                          err.message?.includes('429') || 
-                          err.message?.includes('Resource has been exhausted') ||
-                          err.status === 503 ||
-                          err.status === 429;
+      // Hard quota errors shouldn't be retried as they represent an exceeded limit
+      const isQuotaExceeded = err.message?.includes('429') || 
+                             err.message?.includes('Resource has been exhausted') ||
+                             err.message?.includes('quota') ||
+                             err.message?.includes('RESOURCE_EXHAUSTED') ||
+                             err.status === 429;
+
+      const isTransient = (err.message?.includes('503') || 
+                           err.message?.includes('UNAVAILABLE') || 
+                           err.status === 503) && !isQuotaExceeded;
+
       if (isTransient && retries > 0) {
         console.warn(`Gemini API returned transient error. Retrying in ${delay}ms... (Retries left: ${retries})`, err.message);
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -148,7 +153,7 @@ Content:
 ${content}`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-2.5-flash-lite',
+        model: 'gemini-3.5-flash',
         contents: prompt,
       });
 
@@ -186,7 +191,7 @@ Output must be valid JSON matching this schema:
 }`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-2.5-flash-lite',
+        model: 'gemini-3.5-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -231,7 +236,7 @@ Sourced Text:
 ${content}`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-2.5-flash-lite',
+        model: 'gemini-3.5-flash',
         contents: prompt,
       });
 
@@ -268,7 +273,7 @@ Output must be valid JSON matching this schema:
 }`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-2.5-flash-lite',
+        model: 'gemini-3.5-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -325,7 +330,7 @@ Output must be valid JSON matching this schema:
 }`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-2.5-flash-lite',
+        model: 'gemini-3.5-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -393,7 +398,7 @@ Output must be valid JSON matching this schema:
 }`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-2.5-flash-lite',
+        model: 'gemini-3.5-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -453,7 +458,7 @@ Output must be valid JSON matching this schema:
 }`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-2.5-flash-lite',
+        model: 'gemini-3.5-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -482,11 +487,20 @@ Output must be valid JSON matching this schema:
     }
   });
 
+  // Simple in-memory cache to prevent multiple concurrent or repetitive ad-generation calls to Gemini
+  const adCache = new Map<string, any>();
+
   // 4e. AI Dynamic Content-Driven Sponsored Ad Generator
   app.post('/api/ai/ads/generate', async (req, res) => {
     try {
       const { title = '', category = '', tags = [], type = 'sidebar' } = req.body;
       
+      const normalizedCategory = (category || '').toLowerCase().trim();
+      const cacheKey = `${normalizedCategory}_${type}`;
+      if (adCache.has(cacheKey)) {
+        return res.json(adCache.get(cacheKey));
+      }
+
       const ai = getAIClient();
       const prompt = `You are a creative advertising strategist for PulseWire Africa.
 Analyze the following webpage/article context and generate a highly relevant, contextually driven sponsored ad.
@@ -540,7 +554,7 @@ Output must be a valid JSON object matching this schema:
 `;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-2.5-flash-lite',
+        model: 'gemini-3.5-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -560,9 +574,14 @@ Output must be a valid JSON object matching this schema:
         }
       });
 
-      res.json(JSON.parse(response.text || '{}'));
+      const parsedAd = JSON.parse(response.text || '{}');
+      if (parsedAd && parsedAd.title) {
+        adCache.set(cacheKey, parsedAd);
+      }
+      res.json(parsedAd);
     } catch (err: any) {
-      console.warn('AI Ad Generation failed or API Key missing. Returning fallback ad:', err.message);
+      const isQuota = err.message?.includes('429') || err.message?.includes('quota') || err.status === 429 || err.message?.includes('RESOURCE_EXHAUSTED');
+      console.warn(`AI Ad Generation: utilizing fallback ad (${isQuota ? 'rate limit / quota reached' : 'API key unconfigured or invalid'}).`);
       // Fallback dynamic ads based on Category
       const category = (req.body.category || '').toLowerCase();
       let fallbackAd = {

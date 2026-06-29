@@ -4,8 +4,11 @@ export interface Author {
   bio: string;
   avatar: string;
   email: string;
-  role: 'admin' | 'editor' | 'contributor';
+  role: 'admin' | 'editor' | 'contributor' | string;
   createdAt: string;
+  twitter?: string;
+  linkedin?: string;
+  password?: string;
 }
 
 export interface Article {

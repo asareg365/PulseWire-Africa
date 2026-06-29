@@ -243,7 +243,7 @@ export default function AdSenseBanner({ type, contextTitle, contextCategory, con
             <div className="flex-1 min-w-0">
               <span className="text-[9px] text-slate-500 font-mono block font-bold">SPONSOR US</span>
               <a 
-                href="mailto:ads@pulsewire.com"
+                href="mailto:ads@pulsewireafrica.news"
                 className="text-xs font-bold text-red-400 hover:underline truncate block"
               >
                 Advertise with PulseWire
@@ -405,7 +405,7 @@ export default function AdSenseBanner({ type, contextTitle, contextCategory, con
             Ready to advertise with PulseWire? Target your brand to over 2.5M weekly readers in West Africa.
           </p>
           <a 
-            href="mailto:ads@pulsewire.com"
+            href="mailto:ads@pulsewireafrica.news"
             className="mt-3 text-xs text-red-600 font-bold hover:underline inline-flex items-center gap-1"
           >
             Contact Media Bureau <ExternalLink className="h-3 w-3" />

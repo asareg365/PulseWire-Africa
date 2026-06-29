@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Article, AdPlacement, Comment, NewsletterSubscription, CATEGORIES } from '../types';
+import { Article, AdPlacement, Comment, NewsletterSubscription, CATEGORIES, Author } from '../types';
 import { 
   getAllArticles, 
   saveArticle, 
@@ -12,7 +12,10 @@ import {
   approveComment,
   getNewsletterSubscribers,
   clearAllDatabaseData,
-  seedDatabaseIfEmpty
+  seedDatabaseIfEmpty,
+  getAllAuthors,
+  saveAuthor,
+  deleteAuthor
 } from '../lib/db';
 import { auth } from '../lib/firebase';
 import { 
@@ -41,7 +44,8 @@ import {
   Scale,
   Share2,
   Upload,
-  Crop
+  Crop,
+  Users
 } from 'lucide-react';
 import ImageEditorOverlay from './ImageEditorOverlay';
 
@@ -50,7 +54,7 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ navigate }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'articles' | 'ads' | 'comments' | 'newsletter' | 'analytics' | 'database'>('articles');
+  const [activeTab, setActiveTab] = useState<'articles' | 'ads' | 'comments' | 'newsletter' | 'analytics' | 'database' | 'profiles'>('articles');
   
   // Database control states
   const [dbActionLoading, setDbActionLoading] = useState(false);
@@ -60,6 +64,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
   const [articles, setArticles] = useState<Article[]>([]);
   const [ads, setAds] = useState<AdPlacement[]>([]);
   const [comments, setComments] = useState<(Comment & { articleTitle?: string })[]>([]);
+  const [authors, setAuthors] = useState<Author[]>([]);
   const [subscribers, setSubscribers] = useState<NewsletterSubscription[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -100,10 +105,21 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
   const [adLink, setAdLink] = useState('');
   const [adActive, setAdActive] = useState(true);
 
+  // Author Editor states
+  const [editingAuthor, setEditingAuthor] = useState<Author | null>(null);
+  const [authorNameInput, setAuthorNameInput] = useState('');
+  const [authorBioInput, setAuthorBioInput] = useState('');
+  const [authorAvatarInput, setAuthorAvatarInput] = useState('');
+  const [authorEmailInput, setAuthorEmailInput] = useState('');
+  const [authorRoleInput, setAuthorRoleInput] = useState('');
+  const [authorTwitterInput, setAuthorTwitterInput] = useState('');
+  const [authorLinkedinInput, setAuthorLinkedinInput] = useState('');
+  const [authorPasswordInput, setAuthorPasswordInput] = useState('');
+
   // Image Editor Overlay states
   const [imageEditorOpen, setImageEditorOpen] = useState(false);
   const [imageToEdit, setImageToEdit] = useState('');
-  const [activeImageTarget, setActiveImageTarget] = useState<'cover' | 'ad' | 'gallery'>('cover');
+  const [activeImageTarget, setActiveImageTarget] = useState<'cover' | 'ad' | 'gallery' | 'author'>('cover');
 
   const processImageFile = (file: File, onComplete: (url: string) => void) => {
     if (file.size > 2.5 * 1024 * 1024) {
@@ -120,7 +136,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
     reader.readAsDataURL(file);
   };
 
-  const handleUploadAndEdit = (file: File, target: 'cover' | 'ad' | 'gallery') => {
+  const handleUploadAndEdit = (file: File, target: 'cover' | 'ad' | 'gallery' | 'author') => {
     if (file.size > 2.5 * 1024 * 1024) {
       alert("Please select an image smaller than 2.5MB to ensure safe storage in the database.");
       return;
@@ -138,22 +154,74 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
   };
 
   useEffect(() => {
-    loadAllAdminData();
+    // Listen to Auth state changes to fetch correct data with updated credentials
+    const unsubscribe = auth.onAuthStateChanged(() => {
+      loadAllAdminData();
+    });
+    return () => unsubscribe();
   }, []);
 
   const loadAllAdminData = async () => {
     setLoading(true);
     try {
-      const [allArts, allAds, allComms, allSubs] = await Promise.all([
-        getAllArticles(true),
-        getAllAds(),
-        getAllCommentsAcrossArticles(),
-        getNewsletterSubscribers()
+      const fetchArticles = async () => {
+        try {
+          return await getAllArticles(true);
+        } catch (e) {
+          console.warn('Could not fetch articles:', e);
+          return [];
+        }
+      };
+
+      const fetchAds = async () => {
+        try {
+          return await getAllAds();
+        } catch (e) {
+          console.warn('Could not fetch ads:', e);
+          return [];
+        }
+      };
+
+      const fetchComments = async () => {
+        try {
+          return await getAllCommentsAcrossArticles();
+        } catch (e) {
+          console.warn('Could not fetch comments:', e);
+          return [];
+        }
+      };
+
+      const fetchSubscribers = async () => {
+        try {
+          return await getNewsletterSubscribers();
+        } catch (e) {
+          console.warn('Could not fetch newsletter subscribers (requires Admin/Editor permissions):', e);
+          return [];
+        }
+      };
+
+      const fetchAuthors = async () => {
+        try {
+          return await getAllAuthors();
+        } catch (e) {
+          console.warn('Could not fetch authors:', e);
+          return [];
+        }
+      };
+
+      const [allArts, allAds, allComms, allSubs, allAuthors] = await Promise.all([
+        fetchArticles(),
+        fetchAds(),
+        fetchComments(),
+        fetchSubscribers(),
+        fetchAuthors()
       ]);
-      setArticles(allArts);
-      setAds(allAds);
-      setComments(allComms);
-      setSubscribers(allSubs);
+
+      setArticles(allArts || []);
+      setAds(allAds || []);
+      setComments(allComms || []);
+      setSubscribers(allSubs || []);
+      setAuthors(allAuthors || []);
     } catch (err) {
       console.error('Error fetching admin data:', err);
     } finally {
@@ -170,6 +238,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
     try {
       await clearAllDatabaseData();
       localStorage.setItem('skip_seeding', 'true');
+      localStorage.removeItem('pulsewire_db_seeded');
       setDbMessage({ text: 'All data has been successfully deleted from the database! Automatic seeding on page load has been disabled.', type: 'success' });
       await loadAllAdminData();
     } catch (err: any) {
@@ -575,7 +644,9 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
       await saveAd(updated);
       setEditingAd(null);
       await loadAllAdminData();
-    } catch (err) {
+      alert("Campaign advertisement creative saved successfully!");
+    } catch (err: any) {
+      alert(`Failed to save advertisement slot: ${err.message || err}`);
       console.error(err);
     }
   };
@@ -588,6 +659,85 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
       } catch (err) {
         console.error(err);
       }
+    }
+  };
+
+  // --- Author/Profile management ---
+
+  const handleCreateAuthor = () => {
+    setEditingAuthor({
+      id: `author-${Date.now()}`,
+      name: '',
+      bio: '',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&h=256&q=80',
+      email: '',
+      role: 'contributor',
+      createdAt: new Date().toISOString(),
+      twitter: '',
+      linkedin: '',
+      password: ''
+    });
+    setAuthorNameInput('');
+    setAuthorBioInput('');
+    setAuthorAvatarInput('https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&h=256&q=80');
+    setAuthorEmailInput('');
+    setAuthorRoleInput('contributor');
+    setAuthorTwitterInput('');
+    setAuthorLinkedinInput('');
+    setAuthorPasswordInput('');
+  };
+
+  const handleEditAuthor = (author: Author) => {
+    setEditingAuthor(author);
+    setAuthorNameInput(author.name || '');
+    setAuthorBioInput(author.bio || '');
+    setAuthorAvatarInput(author.avatar || '');
+    setAuthorEmailInput(author.email || '');
+    setAuthorRoleInput(author.role || 'contributor');
+    setAuthorTwitterInput(author.twitter || '');
+    setAuthorLinkedinInput(author.linkedin || '');
+    setAuthorPasswordInput(author.password || '');
+  };
+
+  const handleSaveAuthor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAuthor) return;
+
+    if (!authorNameInput.trim()) {
+      alert("Please provide an author name.");
+      return;
+    }
+
+    const updated: Author = {
+      ...editingAuthor,
+      name: authorNameInput.trim(),
+      bio: authorBioInput.trim(),
+      avatar: authorAvatarInput,
+      email: authorEmailInput.trim(),
+      role: authorRoleInput,
+      twitter: authorTwitterInput.trim(),
+      linkedin: authorLinkedinInput.trim(),
+      password: authorPasswordInput.trim()
+    };
+
+    try {
+      await saveAuthor(updated);
+      setEditingAuthor(null);
+      await loadAllAdminData();
+    } catch (err: any) {
+      alert(`Failed to save author: ${err.message || err}`);
+    }
+  };
+
+  const handleDeleteAuthor = async (authorId: string) => {
+    if (!window.confirm("Are you sure you want to delete this author profile?")) {
+      return;
+    }
+    try {
+      await deleteAuthor(authorId);
+      await loadAllAdminData();
+    } catch (err: any) {
+      alert(`Failed to delete author: ${err.message || err}`);
     }
   };
 
@@ -1623,6 +1773,203 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
         </div>
       )}
 
+      {/* Author profile editor modal */}
+      {editingAuthor && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-950/60 backdrop-blur-sm p-4 flex items-center justify-center">
+          <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Register & Configure Journalist Profile</h3>
+            
+            <form onSubmit={handleSaveAuthor} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Full Name</label>
+                  <input 
+                    type="text" 
+                    required
+                    placeholder="e.g. Ama Serwaa"
+                    value={authorNameInput}
+                    onChange={e => setAuthorNameInput(e.target.value)}
+                    className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Editorial Role / Designation</label>
+                  <input 
+                    type="text" 
+                    required
+                    placeholder="e.g. Senior Correspondent"
+                    value={authorRoleInput}
+                    onChange={e => setAuthorRoleInput(e.target.value)}
+                    className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Email Address</label>
+                  <input 
+                    type="email" 
+                    required
+                    placeholder="e.g. ama.serwaa@pulsewireafrica.news"
+                    value={authorEmailInput}
+                    onChange={e => setAuthorEmailInput(e.target.value)}
+                    className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Login Password / Details</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. securePass123"
+                    value={authorPasswordInput}
+                    onChange={e => setAuthorPasswordInput(e.target.value)}
+                    className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Professional Bio</label>
+                <textarea 
+                  rows={3}
+                  required
+                  placeholder="Tell readers about this journalist's background, track record, and coverage beats..."
+                  value={authorBioInput}
+                  onChange={e => setAuthorBioInput(e.target.value)}
+                  className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Twitter Handle (no @)</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. AmaSerwaaTech"
+                    value={authorTwitterInput}
+                    onChange={e => setAuthorTwitterInput(e.target.value)}
+                    className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">LinkedIn Username/ID</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. ama-serwaa"
+                    value={authorLinkedinInput}
+                    onChange={e => setAuthorLinkedinInput(e.target.value)}
+                    className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Avatar / Profile Picture URL</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="https://images.unsplash.com/photo-..."
+                  value={authorAvatarInput}
+                  onChange={e => setAuthorAvatarInput(e.target.value)}
+                  className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white mb-2 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+
+                {/* Drag and Drop Zone */}
+                <div 
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) {
+                      handleUploadAndEdit(file, 'author');
+                    }
+                  }}
+                  onClick={() => {
+                    document.getElementById('author-file-upload')?.click();
+                  }}
+                  className="border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-emerald-500 rounded-lg p-3 text-center cursor-pointer transition-all bg-gray-50 dark:bg-gray-950 relative overflow-hidden group min-h-[80px] flex flex-col justify-center items-center"
+                >
+                  {authorAvatarInput ? (
+                    <>
+                      <img 
+                        src={authorAvatarInput} 
+                        alt="Profile Preview" 
+                        className="absolute inset-0 w-full h-full object-cover opacity-20 dark:opacity-45 group-hover:opacity-10 transition-opacity" 
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="relative z-10 text-center">
+                        <Upload className="mx-auto h-4 w-4 text-emerald-600 mb-0.5" />
+                        <p className="text-[10px] text-gray-500 font-semibold">
+                          Profile photo loaded. Drag & drop another or <span className="text-emerald-600">Browse</span>
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="relative z-10">
+                      <Upload className="mx-auto h-4 w-4 text-gray-400 mb-0.5" />
+                      <p className="text-[10px] text-gray-500 font-semibold">
+                        Drag & Drop Profile Photo or <span className="text-emerald-600">Browse</span>
+                      </p>
+                    </div>
+                  )}
+                  <input 
+                    type="file" 
+                    id="author-file-upload" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleUploadAndEdit(file, 'author');
+                      }
+                    }}
+                  />
+                </div>
+
+                {authorAvatarInput && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageToEdit(authorAvatarInput);
+                      setActiveImageTarget('author');
+                      setImageEditorOpen(true);
+                    }}
+                    className="mt-2 w-full flex items-center justify-center gap-1.5 py-1.5 px-3 border border-emerald-200 dark:border-emerald-800 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 font-bold text-[10px] hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-800 transition-all font-sans"
+                  >
+                    <Crop className="h-3.5 w-3.5 text-emerald-600" />
+                    Adjust Framing & Filters
+                  </button>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button 
+                  type="button"
+                  onClick={() => setEditingAuthor(null)}
+                  className="flex-1 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold text-xs uppercase"
+                >
+                  Close
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase"
+                >
+                  Save Profile
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Admin Tab Switching Navigation */}
       <div className="flex items-center space-x-1 border-b border-gray-200 dark:border-gray-800 mb-8 overflow-x-auto scrollbar-none pb-1">
         <button 
@@ -1679,6 +2026,17 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
         >
           <BarChart3 className="h-4 w-4" />
           Audience Analytics
+        </button>
+        <button 
+          onClick={() => setActiveTab('profiles')}
+          className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
+            activeTab === 'profiles' 
+              ? 'border-red-600 text-red-600' 
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+          }`}
+        >
+          <Users className="h-4 w-4 text-emerald-500" />
+          Bureau Profiles ({authors.length})
         </button>
         <button 
           onClick={() => setActiveTab('database')}
@@ -2047,6 +2405,91 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
             </div>
           )}
 
+          {/* TAB: BUREAU PROFILES */}
+          {activeTab === 'profiles' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest font-mono">Bureau Journalists & Editors</span>
+                <button 
+                  onClick={handleCreateAuthor}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-sm"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Journalist Profile
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {authors.length === 0 ? (
+                  <div className="md:col-span-2 text-center py-20 border border-dashed border-gray-200 dark:border-gray-800 rounded-xl text-gray-400 font-mono bg-white dark:bg-gray-950">
+                    No bureau profiles registered yet. Click Add Journalist Profile to create one.
+                  </div>
+                ) : (
+                  authors.map(author => (
+                    <div key={author.id} className="border border-gray-200 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-950 p-6 space-y-4 shadow-sm flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-start gap-4">
+                          <img 
+                            src={author.avatar} 
+                            alt={author.name} 
+                            className="w-14 h-14 rounded-full object-cover border border-gray-200 dark:border-gray-800 shrink-0"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-base text-gray-900 dark:text-white font-sans">{author.name}</h4>
+                            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-mono tracking-tight font-semibold mt-0.5">{author.role}</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500 font-mono truncate mt-0.5">{author.email}</p>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed font-sans mt-4 line-clamp-3">
+                          {author.bio || 'No bio provided.'}
+                        </p>
+
+                        <div className="flex items-center gap-3.5 mt-4 pt-1">
+                          {author.twitter && (
+                            <span className="text-[10px] bg-sky-50 dark:bg-sky-950/30 text-sky-600 dark:text-sky-400 px-2.5 py-1 rounded font-mono font-bold uppercase tracking-wider">
+                              @{author.twitter}
+                            </span>
+                          )}
+                          {author.linkedin && (
+                            <span className="text-[10px] bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded font-mono font-bold uppercase tracking-wider">
+                              In/{author.linkedin}
+                            </span>
+                          )}
+                        </div>
+
+                        {author.password && (
+                          <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-lg flex items-center justify-between">
+                            <span className="text-[10px] text-gray-400 font-mono font-bold uppercase">Password:</span>
+                            <span className="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400 select-all">{author.password}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-end border-t border-gray-100 dark:border-gray-900 pt-4 mt-2 gap-2">
+                        <button 
+                          onClick={() => handleEditAuthor(author)} 
+                          className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50/20 dark:hover:bg-emerald-950/10 text-gray-700 dark:text-gray-300 text-xs font-semibold flex items-center gap-1 transition-all"
+                        >
+                          <Edit className="h-3.5 w-3.5 text-emerald-600" />
+                          Edit Details
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteAuthor(author.id)} 
+                          className="px-3 py-1.5 rounded-lg border border-red-100 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-1 transition-all"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
           {/* TAB 6: DATABASE ADMINISTRATION */}
           {activeTab === 'database' && (
             <div className="space-y-6">
@@ -2152,6 +2595,8 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
             if (!editorImages.includes(editedImage)) {
               setEditorImages([...editorImages, editedImage]);
             }
+          } else if (activeImageTarget === 'author') {
+            setAuthorAvatarInput(editedImage);
           }
           setImageEditorOpen(false);
           setImageToEdit('');

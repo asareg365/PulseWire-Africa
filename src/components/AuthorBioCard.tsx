@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown, ChevronUp, Mail, Twitter, Linkedin, Award, BookOpen } from 'lucide-react';
+import { getAllAuthors } from '../lib/db';
 
 interface AuthorProfile {
   role: string;
@@ -16,7 +17,7 @@ const AUTHOR_PROFILES: Record<string, AuthorProfile> = {
     role: "Founder & Chief Editor",
     bio: "George Oppong Asare oversees all editorial operations, deep-dive investigations, and strategic bureau expansion across West Africa. He is a seasoned investigative journalist with over a decade of experience tracking economic development, public governance, and trade infrastructure on the continent.",
     avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=256&h=256&q=80",
-    email: "editor@pulsewire.com",
+    email: "editor@pulsewireafrica.news",
     twitter: "GeorgeAsarePW",
     linkedin: "george-oppong-asare"
   },
@@ -24,7 +25,7 @@ const AUTHOR_PROFILES: Record<string, AuthorProfile> = {
     role: "Chief Administrator & Lead Editor",
     bio: "Christian manages day-to-day operations, editorial standards, and newsroom workflows. An expert in regional economic integration and development models, he ensures PulseWire's reporting remains hyper-factual, highly contextualized, and fully independent.",
     avatar: "https://images.unsplash.com/photo-1531384441138-2736e62e0919?auto=format&fit=crop&w=256&h=256&q=80",
-    email: "admin@pulsewire.com",
+    email: "admin@pulsewireafrica.news",
     twitter: "CAT_PulseWire",
     linkedin: "christian-asare-tuah"
   },
@@ -32,21 +33,21 @@ const AUTHOR_PROFILES: Record<string, AuthorProfile> = {
     role: "Senior Tech & Business Correspondent",
     bio: "Ama reports on tech ecosystems, financial inclusion, and the startup landscape redefining West and East African commerce. With a background in financial economics, her columns analyze how digital technologies bypass traditional market barriers.",
     avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80",
-    email: "ama.serwaa@pulsewire.com",
+    email: "ama.serwaa@pulsewireafrica.news",
     twitter: "AmaSerwaaTech"
   },
   'kofi owusu': {
     role: "Regional Politics & Governance Analyst",
     bio: "Kofi focuses on democratic transitions, election integrity, and multilateral diplomatic relationships within the ECOWAS and African Union blocs. He has covered multiple historic elections and specializes in constitutional reform policy.",
     avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=256&h=256&q=80",
-    email: "kofi.owusu@pulsewire.com",
+    email: "kofi.owusu@pulsewireafrica.news",
     twitter: "KofiOwusuGov"
   },
   'abidemi babangida': {
     role: "Investigative Reporter & Energy Correspondent",
     bio: "Abidemi leads investigative coverage on climate policy, infrastructure funding, oil & gas concessions, and the green transition in sub-Saharan Africa. She is a recipient of several journalism awards for environmental reporting.",
     avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=256&h=256&q=80",
-    email: "abidemi.b@pulsewire.com",
+    email: "abidemi.b@pulsewireafrica.news",
     twitter: "AbidemiEnergy"
   }
 };
@@ -91,13 +92,47 @@ export function getAuthorProfileDetails(authorName: string): { name: string } & 
     role: "PulseWire Contributing Writer",
     bio: `${authorName || 'This contributor'} is a dedicated journalist reporting on key developments, regional insights, and in-depth investigations for the PulseWire news bureau across Sub-Saharan Africa.`,
     avatar,
-    email: "editorial@pulsewire.com"
+    email: "editorial@pulsewireafrica.news"
   };
 }
 
 export default function AuthorBioCard({ authorName, onSearchAuthor }: AuthorBioCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const profile = getAuthorProfileDetails(authorName);
+  const [profile, setProfile] = useState(() => getAuthorProfileDetails(authorName));
+
+  useEffect(() => {
+    let active = true;
+    async function loadDynamicProfile() {
+      try {
+        const allAuthors = await getAllAuthors();
+        if (!active) return;
+        const normalizedSearch = (authorName || '').trim().toLowerCase();
+        
+        const matchedDbAuthor = allAuthors.find(a => {
+          const n = (a.name || '').toLowerCase();
+          return n === normalizedSearch || normalizedSearch.includes(n) || n.includes(normalizedSearch);
+        });
+        
+        if (matchedDbAuthor) {
+          setProfile({
+            name: matchedDbAuthor.name,
+            role: matchedDbAuthor.role,
+            bio: matchedDbAuthor.bio,
+            avatar: matchedDbAuthor.avatar,
+            email: matchedDbAuthor.email,
+            twitter: matchedDbAuthor.twitter,
+            linkedin: matchedDbAuthor.linkedin
+          });
+        }
+      } catch (err) {
+        console.error("Error loading dynamic author profile:", err);
+      }
+    }
+    loadDynamicProfile();
+    return () => {
+      active = false;
+    };
+  }, [authorName]);
 
   return (
     <div 
