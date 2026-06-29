@@ -1,6 +1,23 @@
 {
   "firestore": {
     "rules": "firestore.rules",
-    "database": "ai-studio-ce7cc083-15ac-489c-b8ff-506dc3277285"
+    "database": "ai-studio-pulsewireafrica-ce7cc083-15ac-489c-b8ff-506dc3277285"
+  },
+  "hosting": {
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "run": {
+          "serviceId": "pulsewire-news",
+          "region": "us-central1"
+        }
+      }
+    ]
   }
 }
