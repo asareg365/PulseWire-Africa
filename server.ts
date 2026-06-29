@@ -658,7 +658,7 @@ Output must be a valid JSON object matching this schema:
       // In a robust application, we would load the article from Firestore on the server.
       // To bypass loading heavy Node firebase packages on the server when doing SSR,
       // we can query the Firestore REST API runQuery endpoint directly which is ultra-fast, zero-dependency, and extremely robust!
-      const firestoreQueryUrl = `https://firestore.googleapis.com/v1/projects/pulsewire-africa/databases/ai-studio-ce7cc083-15ac-489c-b8ff-506dc3277285/documents:runQuery`;
+      const firestoreQueryUrl = `https://firestore.googleapis.com/v1/projects/pulsewireafrica/databases/ai-studio-pulsewireafrica-ce7cc083-15ac-489c-b8ff-506dc3277285/documents:runQuery`;
       
       const response = await fetch(firestoreQueryUrl, {
         method: 'POST',
@@ -756,11 +756,11 @@ Output must be a valid JSON object matching this schema:
     <!-- PulseWire Africa Dynamic SEO SSR -->
     <title>${articleData.title} | PulseWire Africa</title>
     <meta name="description" content="${articleData.summary.replace(/"/g, '&quot;')}" />
-    <link rel="canonical" href="${process.env.APP_URL || 'https://pulsewire-africa-504216611238.us-west2.run.app'}/article/${slug}" />
+    <link rel="canonical" href="${process.env.APP_URL || 'https://pulsewireafrica-152570020464.us-west2.run.app'}/article/${slug}" />
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="article" />
-    <meta property="og:url" content="${process.env.APP_URL || 'https://pulsewire-africa-504216611238.us-west2.run.app'}/article/${slug}" />
+    <meta property="og:url" content="${process.env.APP_URL || 'https://pulsewireafrica-152570020464.us-west2.run.app'}/article/${slug}" />
     <meta property="og:title" content="${articleData.title.replace(/"/g, '&quot;')}" />
     <meta property="og:description" content="${articleData.summary.replace(/"/g, '&quot;')}" />
     <meta property="og:image" content="${articleData.featuredImage}" />
@@ -795,7 +795,7 @@ Output must be a valid JSON object matching this schema:
   // --- Dynamic XML Sitemap ---
   app.get('/sitemap.xml', async (req, res) => {
     try {
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/pulsewire-africa/databases/ai-studio-ce7cc083-15ac-489c-b8ff-506dc3277285/documents/articles?pageSize=100`;
+      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/pulsewireafrica/databases/ai-studio-pulsewireafrica-ce7cc083-15ac-489c-b8ff-506dc3277285/documents/articles?pageSize=100`;
       const response = await fetch(firestoreUrl);
       let articles: any[] = [];
       
@@ -814,7 +814,7 @@ Output must be a valid JSON object matching this schema:
         }
       }
 
-      const appUrl = process.env.APP_URL || 'https://pulsewire-africa-504216611238.us-west2.run.app';
+      const appUrl = process.env.APP_URL || 'https://pulsewireafrica-152570020464.us-west2.run.app';
       const categories = ['ghana', 'africa', 'world', 'sports', 'football', 'business', 'technology', 'entertainment', 'health', 'lifestyle'];
 
       let xml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -864,7 +864,7 @@ Output must be a valid JSON object matching this schema:
 
   // --- Dynamic Robots.txt ---
   app.get('/robots.txt', (req, res) => {
-    const appUrl = process.env.APP_URL || 'https://pulsewire-africa-504216611238.us-west2.run.app';
+    const appUrl = process.env.APP_URL || 'https://pulsewireafrica-152570020464.us-west2.run.app';
     const content = `User-agent: *
 Allow: /
 Disallow: /admin

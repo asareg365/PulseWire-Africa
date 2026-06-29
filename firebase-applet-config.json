@@ -1,10 +1,10 @@
 {
-  "projectId": "pulsewire-africa",
-  "appId": "1:504216611238:web:7b28edb04e165f85d14767",
-  "apiKey": "AIzaSyAgVjfQZShOjI48rENWsePqbcEnG3JkBDc",
-  "authDomain": "pulsewire-africa.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-ce7cc083-15ac-489c-b8ff-506dc3277285",
-  "storageBucket": "pulsewire-africa.firebasestorage.app",
-  "messagingSenderId": "504216611238",
+  "projectId": "pulsewireafrica",
+  "appId": "1:152570020464:web:20f6c3a8bcf47a3609eab5",
+  "apiKey": "AIzaSyBwsQfYEUZkdT8kT9eVKv2OFrZ2lA4C_IM",
+  "authDomain": "pulsewireafrica.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-pulsewireafrica-ce7cc083-15ac-489c-b8ff-506dc3277285",
+  "storageBucket": "pulsewireafrica.firebasestorage.app",
+  "messagingSenderId": "152570020464",
   "measurementId": ""
 }
