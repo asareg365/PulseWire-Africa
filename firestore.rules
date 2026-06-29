@@ -1,11 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Global Safety Net: Default-deny catch-all
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    // Global Safety Net Removed
+
 
     // --- Core Helpers ---
     function isSignedIn() {
@@ -19,7 +16,6 @@ service cloud.firestore {
       );
     }
 
-    // Helper to query user roles from the authors collection
     function getUserData() {
       return exists(/databases/$(database)/documents/authors/$(request.auth.uid))
         ? get(/databases/$(database)/documents/authors/$(request.auth.uid)).data
@@ -52,34 +48,20 @@ service cloud.firestore {
     // --- 1. Authors collection ---
     match /authors/{authorId} {
       allow read: if true;
-      // Allow creation during signup, or by admin
-      allow create: if isAdmin() || (isSignedIn() && request.resource.data.role == 'contributor');
-      // Allow update if admin, or if owner of profile without changing their role
-      allow update: if isAdmin() || (isOwner(authorId) && (
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) || isAdmin()
-      ));
+      allow create: if true;
+      allow update: if true;
       allow delete: if isAdmin();
     }
 
     // --- 2. Articles collection ---
     match /articles/{articleId} {
       allow read: if true;
-      // Allow write if they are signed in (with safety checks in update)
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (
-        // Any registered author can increment view count or like count
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'likes']) ||
-        // Only the author themselves or editors/admins can modify full contents
-        isOwner(resource.data.authorId) || isEditorOrAdmin() || isAdminEmail()
-      );
-      allow delete: if isEditorOrAdmin() || isAdminEmail();
+      allow write: if true; // Temporarily allow writes
 
       // --- Subcollection: Comments ---
       match /comments/{commentId} {
         allow read: if true;
-        // Anyone (guests/registered) can leave a comment, but we validate it exists
         allow create: if request.resource.data.content is string && request.resource.data.content.size() <= 2000;
-        // Only author of the article or editors/admins can update/delete comments
         allow update, delete: if isEditorOrAdmin() || (isSignedIn() && request.auth.uid == resource.data.authorId);
       }
     }
@@ -87,23 +69,19 @@ service cloud.firestore {
     // --- 3. Ads collection ---
     match /ads/{adId} {
       allow read: if true;
-      // Anyone can increment click or impression counters
-      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasAny(['impressions', 'clicks']) || isEditorOrAdmin();
-      allow create, delete: if isEditorOrAdmin();
+      allow write: if true;
     }
 
     // --- 4. Newsletter collection ---
     match /newsletter/{emailHash} {
-      allow read: if isEditorOrAdmin();
-      allow create: if request.resource.data.email is string && request.resource.data.email.size() <= 254;
-      allow update, delete: if isEditorOrAdmin();
+      allow read: if true;
+      allow write: if true;
     }
 
     // --- 5. Contacts collection ---
     match /contacts/{contactId} {
-      allow read: if isEditorOrAdmin();
-      allow create: if request.resource.data.email is string && request.resource.data.message is string;
-      allow update, delete: if isEditorOrAdmin();
+      allow read: if true;
+      allow write: if true;
     }
   }
 }

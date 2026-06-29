@@ -371,23 +371,27 @@ export default function App() {
   const [newsletterSuccess, setNewsletterSuccess] = useState(false);
   const [newsletterError, setNewsletterError] = useState('');
 
-  // Scroll listener for newsletter modal (appears at 50% scroll of article page, once per session)
+  // Scroll listener for newsletter modal (appears at 50% scroll of article page)
   useEffect(() => {
     const isArticle = currentPath.startsWith('/article/') && selectedArticle;
-    const hasShownInSession = sessionStorage.getItem('pulsewire_newsletter_shown') === 'true';
+    const hasShown = localStorage.getItem('pulsewire_newsletter_shown') === 'true';
 
-    if (!isArticle || hasShownInSession) {
+    if (!isArticle || hasShown) {
       return;
     }
 
     const handleScroll = () => {
+      if (localStorage.getItem('pulsewire_newsletter_shown') === 'true') {
+        return;
+      }
+      
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
       const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
       if (scrollHeight > 0) {
         const scrollPercent = (scrollTop / scrollHeight) * 100;
         if (scrollPercent >= 50) {
           setShowNewsletterModal(true);
-          sessionStorage.setItem('pulsewire_newsletter_shown', 'true');
+          localStorage.setItem('pulsewire_newsletter_shown', 'true');
         }
       }
     };
@@ -405,7 +409,7 @@ export default function App() {
   useEffect(() => {
     async function initDB() {
       try {
-        await seedDatabaseIfEmpty();
+        // Seeding has been removed per request
         
         // Check if Gemini API is configured
         try {

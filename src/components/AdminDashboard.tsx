@@ -54,7 +54,8 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ navigate }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'articles' | 'ads' | 'comments' | 'newsletter' | 'analytics' | 'database' | 'profiles'>('articles');
+  const [activeTab, setActiveTab] = useState<'articles' | 'ads' | 'comments' | 'newsletter' | 'analytics' | 'database' | 'profiles' | 'saved'>('articles');
+  const [userRole, setUserRole] = useState<'admin' | 'editor' | 'user' | null>(null);
   
   // Database control states
   const [dbActionLoading, setDbActionLoading] = useState(false);
@@ -120,6 +121,9 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
   const [imageEditorOpen, setImageEditorOpen] = useState(false);
   const [imageToEdit, setImageToEdit] = useState('');
   const [activeImageTarget, setActiveImageTarget] = useState<'cover' | 'ad' | 'gallery' | 'author'>('cover');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [dbWipeConfirm, setDbWipeConfirm] = useState(false);
+
 
   const processImageFile = (file: File, onComplete: (url: string) => void) => {
     if (file.size > 2.5 * 1024 * 1024) {
@@ -164,6 +168,32 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
   const loadAllAdminData = async () => {
     setLoading(true);
     try {
+      const activeUser = auth.currentUser;
+      if (!activeUser) {
+        navigate('/');
+        return;
+      }
+      
+      let role: 'admin' | 'editor' | 'user' = 'user';
+      if (activeUser.email === 'asareg365@gmail.com' || activeUser.email === 'admin@pulsewireafrica.news' || activeUser.email?.endsWith('@pulsewireafrica.news')) {
+        role = 'admin';
+      } else {
+        try {
+          const allAuthors = await getAllAuthors();
+          const matched = allAuthors.find(a => a.email.toLowerCase() === activeUser.email?.toLowerCase());
+          if (matched && matched.role === 'editor') {
+            role = 'editor';
+          }
+        } catch(e) {}
+      }
+      setUserRole(role);
+      
+      if (role === 'user') {
+        setActiveTab('saved');
+      } else if (role === 'editor') {
+        setActiveTab('articles');
+      }
+      
       const fetchArticles = async () => {
         try {
           return await getAllArticles(true);
@@ -230,9 +260,6 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
   };
 
   const handleClearDatabase = async () => {
-    if (!window.confirm('Are you absolutely sure you want to delete ALL data from the database? This will permanently remove all articles, comments, newsletters, and advertisements. This cannot be undone.')) {
-      return;
-    }
     setDbActionLoading(true);
     setDbMessage(null);
     try {
@@ -241,6 +268,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
       localStorage.removeItem('pulsewire_db_seeded');
       setDbMessage({ text: 'All data has been successfully deleted from the database! Automatic seeding on page load has been disabled.', type: 'success' });
       await loadAllAdminData();
+      setDbWipeConfirm(false);
     } catch (err: any) {
       setDbMessage({ text: `Failed to clear database: ${err.message || err}`, type: 'error' });
     } finally {
@@ -375,13 +403,12 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
   };
 
   const handleDeleteArticle = async (id: string) => {
-    if (confirm('Are you absolutely sure you want to delete this article? This is permanent.')) {
-      try {
-        await deleteArticle(id);
-        await loadAllAdminData();
-      } catch (err) {
-        console.error(err);
-      }
+    try {
+      await deleteArticle(id);
+      setDeleteConfirmId(null);
+      await loadAllAdminData();
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -652,13 +679,12 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
   };
 
   const handleDeleteAd = async (id: string) => {
-    if (confirm('Delete this advertisement slot?')) {
-      try {
-        await deleteAd(id);
-        await loadAllAdminData();
-      } catch (err) {
-        console.error(err);
-      }
+    try {
+      await deleteAd(id);
+      setDeleteConfirmId(null);
+      await loadAllAdminData();
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -736,11 +762,9 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
   };
 
   const handleDeleteAuthor = async (authorId: string) => {
-    if (!window.confirm("Are you sure you want to delete this author profile?")) {
-      return;
-    }
     try {
       await deleteAuthor(authorId);
+      setDeleteConfirmId(null);
       await loadAllAdminData();
     } catch (err: any) {
       alert(`Failed to delete author: ${err.message || err}`);
@@ -759,13 +783,12 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
   };
 
   const handleDeleteComment = async (artId: string, commId: string) => {
-    if (confirm('Delete this reader comment?')) {
-      try {
-        await deleteComment(artId, commId);
-        await loadAllAdminData();
-      } catch (err) {
-        console.error(err);
-      }
+    try {
+      await deleteComment(artId, commId);
+      setDeleteConfirmId(null);
+      await loadAllAdminData();
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -1978,83 +2001,108 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
 
       {/* Admin Tab Switching Navigation */}
       <div className="flex items-center space-x-1 border-b border-gray-200 dark:border-gray-800 mb-8 overflow-x-auto scrollbar-none pb-1">
+        
+        {/* Saved News (For everyone, but only tab for ordinary users) */}
         <button 
-          onClick={() => setActiveTab('articles')}
+          onClick={() => setActiveTab('saved')}
           className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
-            activeTab === 'articles' 
+            activeTab === 'saved' 
               ? 'border-red-600 text-red-600' 
               : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
           }`}
         >
-          <FileText className="h-4 w-4" />
-          Newsroom Articles ({articles.length})
+          <Layers className="h-4 w-4" />
+          Saved News
         </button>
-        <button 
-          onClick={() => setActiveTab('ads')}
-          className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
-            activeTab === 'ads' 
-              ? 'border-red-600 text-red-600' 
-              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-          }`}
-        >
-          <DollarSign className="h-4 w-4 text-emerald-500" />
-          Campaign Ads ({ads.length})
-        </button>
-        <button 
-          onClick={() => setActiveTab('comments')}
-          className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
-            activeTab === 'comments' 
-              ? 'border-red-600 text-red-600' 
-              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-          }`}
-        >
-          <MessageSquare className="h-4 w-4" />
-          Discussion Moderation ({comments.length})
-        </button>
-        <button 
-          onClick={() => setActiveTab('newsletter')}
-          className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
-            activeTab === 'newsletter' 
-              ? 'border-red-600 text-red-600' 
-              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-          }`}
-        >
-          <Mail className="h-4 w-4" />
-          Bulletins ({subscribers.length})
-        </button>
-        <button 
-          onClick={() => setActiveTab('analytics')}
-          className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
-            activeTab === 'analytics' 
-              ? 'border-red-600 text-red-600' 
-              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-          }`}
-        >
-          <BarChart3 className="h-4 w-4" />
-          Audience Analytics
-        </button>
-        <button 
-          onClick={() => setActiveTab('profiles')}
-          className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
-            activeTab === 'profiles' 
-              ? 'border-red-600 text-red-600' 
-              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-          }`}
-        >
-          <Users className="h-4 w-4 text-emerald-500" />
-          Bureau Profiles ({authors.length})
-        </button>
-        <button 
-          onClick={() => setActiveTab('database')}
-          className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
-            activeTab === 'database' 
-              ? 'border-red-600 text-red-600' 
-              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-          }`}
-        >
-          <Database className="h-4 w-4 text-orange-500" />
-          Database Admin
-        </button>
+
+        {(userRole === 'admin' || userRole === 'editor') && (
+          <>
+            <button 
+              onClick={() => setActiveTab('articles')}
+              className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
+                activeTab === 'articles' 
+                  ? 'border-red-600 text-red-600' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              <FileText className="h-4 w-4" />
+              Newsroom Articles ({articles.length})
+            </button>
+            
+            <button 
+              onClick={() => setActiveTab('comments')}
+              className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
+                activeTab === 'comments' 
+                  ? 'border-red-600 text-red-600' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              <MessageSquare className="h-4 w-4" />
+              Discussion Moderation ({comments.length})
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('profiles')}
+              className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
+                activeTab === 'profiles' 
+                  ? 'border-red-600 text-red-600' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              <Users className="h-4 w-4 text-emerald-500" />
+              Bureau Profiles ({authors.length})
+            </button>
+          </>
+        )}
+
+        {userRole === 'admin' && (
+          <>
+            <button 
+              onClick={() => setActiveTab('ads')}
+              className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
+                activeTab === 'ads' 
+                  ? 'border-red-600 text-red-600' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              <DollarSign className="h-4 w-4 text-emerald-500" />
+              Campaign Ads ({ads.length})
+            </button>
+            <button 
+              onClick={() => setActiveTab('newsletter')}
+              className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
+                activeTab === 'newsletter' 
+                  ? 'border-red-600 text-red-600' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              <Mail className="h-4 w-4" />
+              Bulletins ({subscribers.length})
+            </button>
+            <button 
+              onClick={() => setActiveTab('analytics')}
+              className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
+                activeTab === 'analytics' 
+                  ? 'border-red-600 text-red-600' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              <BarChart3 className="h-4 w-4" />
+              Audience Analytics
+            </button>
+            <button 
+              onClick={() => setActiveTab('database')}
+              className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
+                activeTab === 'database' 
+                  ? 'border-red-600 text-red-600' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              <Database className="h-4 w-4 text-orange-500" />
+              Database Admin
+            </button>
+          </>
+        )}
       </div>
 
       {loading ? (
@@ -2065,6 +2113,28 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
       ) : (
         <div className="min-h-[400px]">
           
+          {/* TAB 0: SAVED NEWS */}
+          {activeTab === 'saved' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest font-mono">My Saved Articles</span>
+              </div>
+              <div className="bg-white dark:bg-gray-950 p-8 text-center border border-gray-200 dark:border-gray-800 rounded-xl">
+                <Layers className="h-12 w-12 text-gray-300 dark:text-gray-700 mx-auto mb-4" />
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No Saved News</h3>
+                <p className="text-gray-500 text-sm max-w-md mx-auto">
+                  You haven't saved any articles yet. When you read an article, click the save button to keep it here for later reading.
+                </p>
+                <button 
+                  onClick={() => navigate('/')}
+                  className="mt-6 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg transition-all"
+                >
+                  Browse Home
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* TAB 1: ARTICLES */}
           {activeTab === 'articles' && (
             <div className="space-y-6">
@@ -2140,13 +2210,30 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                               >
                                 <Edit className="h-4 w-4" />
                               </button>
-                              <button 
-                                onClick={() => handleDeleteArticle(art.id)}
-                                className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400"
-                                title="Delete Article"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                              {deleteConfirmId === art.id ? (
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleDeleteArticle(art.id)}
+                                    className="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                                  >
+                                    Confirm
+                                  </button>
+                                  <button
+                                    onClick={() => setDeleteConfirmId(null)}
+                                    className="px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-xs rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <button 
+                                  onClick={() => setDeleteConfirmId(art.id)}
+                                  className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400"
+                                  title="Delete Article"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -2217,7 +2304,14 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                         </a>
                         <div className="flex gap-2 shrink-0">
                           <button onClick={() => handleEditAd(ad)} className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300"><Edit className="h-4 w-4" /></button>
-                          <button onClick={() => handleDeleteAd(ad.id)} className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/20 text-red-600 dark:text-red-400"><Trash2 className="h-4 w-4" /></button>
+                          {deleteConfirmId === `ad_${ad.id}` ? (
+                            <div className="flex gap-1">
+                              <button onClick={() => handleDeleteAd(ad.id)} className="px-2 py-1 bg-red-600 text-white text-xs rounded">Confirm</button>
+                              <button onClick={() => setDeleteConfirmId(null)} className="px-2 py-1 bg-gray-200 dark:bg-gray-700 text-xs rounded">Cancel</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => setDeleteConfirmId(`ad_${ad.id}`)} className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/20 text-red-600 dark:text-red-400"><Trash2 className="h-4 w-4" /></button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -2259,13 +2353,30 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                             <Check className="h-3.5 w-3.5" /> Approve
                           </button>
                         )}
-                        <button 
-                          onClick={() => handleDeleteComment(comm.articleId, comm.id)}
-                          className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/20 text-red-600 dark:text-red-400"
-                          title="Reject / Delete comment"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {deleteConfirmId === `comment_${comm.id}` ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleDeleteComment(comm.articleId, comm.id)}
+                              className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 transition-colors"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(null)}
+                              className="px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-xs font-bold rounded hover:bg-gray-300 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => setDeleteConfirmId(`comment_${comm.id}`)}
+                            className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/20 text-red-600 dark:text-red-400 transition-colors"
+                            title="Reject / Delete comment"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -2481,13 +2592,30 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                           <Edit className="h-3.5 w-3.5 text-emerald-600" />
                           Edit Details
                         </button>
-                        <button 
-                          onClick={() => handleDeleteAuthor(author.id)} 
-                          className="px-3 py-1.5 rounded-lg border border-red-100 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-1 transition-all"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Remove
-                        </button>
+                        {deleteConfirmId === `author_${author.id}` ? (
+                          <div className="flex gap-1">
+                            <button 
+                              onClick={() => handleDeleteAuthor(author.id)} 
+                              className="px-3 py-1.5 rounded-lg border border-red-600 bg-red-600 text-white text-xs font-semibold transition-all hover:bg-red-700"
+                            >
+                              Confirm
+                            </button>
+                            <button 
+                              onClick={() => setDeleteConfirmId(null)} 
+                              className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold transition-all hover:bg-gray-200 dark:hover:bg-gray-700"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => setDeleteConfirmId(`author_${author.id}`)} 
+                            className="px-3 py-1.5 rounded-lg border border-red-100 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-1 transition-all"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Remove
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -2546,18 +2674,38 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                   
                   <div className="flex flex-col sm:flex-row gap-4">
                     {/* Clear Button */}
-                    <button
-                      onClick={handleClearDatabase}
-                      disabled={dbActionLoading}
-                      className="flex-1 py-3 px-4 rounded-xl border border-red-200 hover:border-red-300 dark:border-red-950/50 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 text-red-600 dark:text-red-400 font-bold text-xs uppercase tracking-wider font-mono transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      {dbActionLoading ? (
-                        <div className="h-4 w-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
-                      ) : (
+                    {dbWipeConfirm ? (
+                      <div className="flex-1 flex gap-2">
+                        <button
+                          onClick={handleClearDatabase}
+                          disabled={dbActionLoading}
+                          className="flex-1 py-3 px-4 rounded-xl border border-red-600 bg-red-600 text-white font-bold text-xs uppercase tracking-wider font-mono transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          {dbActionLoading ? (
+                            <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                          Confirm Wipe
+                        </button>
+                        <button
+                          onClick={() => setDbWipeConfirm(false)}
+                          disabled={dbActionLoading}
+                          className="px-4 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold text-xs uppercase tracking-wider font-mono transition-colors disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setDbWipeConfirm(true)}
+                        disabled={dbActionLoading}
+                        className="flex-1 py-3 px-4 rounded-xl border border-red-200 hover:border-red-300 dark:border-red-950/50 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 text-red-600 dark:text-red-400 font-bold text-xs uppercase tracking-wider font-mono transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
                         <Trash2 className="h-4 w-4" />
-                      )}
-                      Clear All Database Data
-                    </button>
+                        Clear All Database Data
+                      </button>
+                    )}
 
                     {/* Seed Button */}
                     <button

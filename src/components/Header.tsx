@@ -52,14 +52,23 @@ export default function Header({
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        // Automatically make asareg365@gmail.com or any authenticated test user an admin
         if (currentUser.email === 'asareg365@gmail.com' || currentUser.email?.endsWith('@pulsewireafrica.news') || currentUser.email === 'admin@pulsewireafrica.news') {
           setIsAdmin(true);
         } else {
-          setIsAdmin(false);
+          try {
+            const authorsList = await getAllAuthors();
+            const matched = authorsList.find(a => a.email.toLowerCase() === currentUser.email?.toLowerCase());
+            if (matched && (matched.role === 'admin' || matched.role === 'editor')) {
+              setIsAdmin(true);
+            } else {
+              setIsAdmin(false);
+            }
+          } catch(e) {
+            setIsAdmin(false);
+          }
         }
       } else {
         setIsAdmin(false);
@@ -257,7 +266,7 @@ export default function Header({
             </AnimatePresence>
           </button>
 
-          {/* Admin Dashboard Shortcut */}
+          {/* Dashboard Shortcut */}
           {isAdmin && (
             <button 
               onClick={() => navigate('/admin')}
@@ -269,7 +278,7 @@ export default function Header({
               id="btn-admin-dashboard"
             >
               <Lock className="h-3.5 w-3.5" />
-              Admin
+              Dashboard
             </button>
           )}
 
@@ -383,7 +392,7 @@ export default function Header({
               className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 font-bold uppercase text-xs tracking-wider"
             >
               <Lock className="h-4 w-4" />
-              Go to Admin Dashboard
+              Go to Dashboard
             </button>
           )}
 

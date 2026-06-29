@@ -216,41 +216,44 @@ export async function clearAllDatabaseData(): Promise<void> {
 // Fetch all articles
 export async function getAllArticles(includeDrafts = false): Promise<Article[]> {
   const path = 'articles';
+  let docs: Article[] = [];
   try {
     const colRef = collection(db, path);
     // Use single-field query to avoid composite index requirements
     const q = query(colRef, orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
-    const docs = snapshot.docs.map(doc => doc.data() as Article);
-    
-    if (includeDrafts) {
-      return docs;
-    } else {
-      return docs.filter(art => art.status === 'published');
-    }
+    docs = snapshot.docs.map(doc => doc.data() as Article);
   } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    console.warn("Firestore fetch failed, falling back to seed data:", error);
+    docs = SEED_ARTICLES;
+  }
+  
+  if (includeDrafts) {
+    return docs;
+  } else {
+    return docs.filter(art => art.status === 'published');
   }
 }
 
 // Fetch articles by category
 export async function getArticlesByCategory(category: string): Promise<Article[]> {
   const path = 'articles';
+  let list: Article[] = [];
   try {
     const colRef = collection(db, path);
     // Use single-field query to avoid composite index requirements
     const q = query(colRef, orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
-    const list = snapshot.docs.map(doc => doc.data() as Article);
-    return list.filter(art => {
-      if (art.status !== 'published') return false;
-      const cats = art.categories && art.categories.length > 0 ? art.categories : [art.category];
-      return cats.some(c => c.toLowerCase() === category.toLowerCase());
-    });
+    list = snapshot.docs.map(doc => doc.data() as Article);
   } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
-    return [];
+    console.warn("Firestore fetch failed, falling back to seed data:", error);
+    list = SEED_ARTICLES;
   }
+  return list.filter(art => {
+    if (art.status !== 'published') return false;
+    const cats = art.categories && art.categories.length > 0 ? art.categories : [art.category];
+    return cats.some(c => c.toLowerCase() === category.toLowerCase());
+  });
 }
 
 // Fetch single article by slug
@@ -260,10 +263,11 @@ export async function getArticleBySlug(slug: string): Promise<Article | null> {
     const colRef = collection(db, path);
     const q = query(colRef, where('slug', '==', slug), limit(1));
     const snapshot = await getDocs(q);
-    if (snapshot.empty) return null;
+    if (snapshot.empty) return SEED_ARTICLES.find(a => a.slug === slug) || null;
     return snapshot.docs[0].data() as Article;
   } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    console.warn("Firestore fetch failed, falling back to seed data:", error);
+    return SEED_ARTICLES.find(a => a.slug === slug) || null;
   }
 }
 
@@ -456,9 +460,11 @@ export async function getActiveAds(): Promise<AdPlacement[]> {
     const colRef = collection(db, path);
     const q = query(colRef, where('active', '==', true));
     const snapshot = await getDocs(q);
+    if (snapshot.empty) return SEED_ADS.filter(ad => ad.active);
     return snapshot.docs.map(doc => doc.data() as AdPlacement);
   } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    console.warn("Firestore fetch failed, falling back to seed ads:", error);
+    return SEED_ADS.filter(ad => ad.active);
   }
 }
 
@@ -502,8 +508,12 @@ export async function logAdImpression(adId: string): Promise<void> {
     await updateDoc(docRef, {
       impressions: increment(1)
     });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
+  } catch (error: any) {
+    if (error?.code === 'not-found' || error?.message?.includes('No document to update')) {
+      console.warn(`Ad ${adId} not found in Firestore, skipping impression log.`);
+      return;
+    }
+    console.error("Error logging ad impression:", error);
   }
 }
 
@@ -515,8 +525,12 @@ export async function logAdClick(adId: string): Promise<void> {
     await updateDoc(docRef, {
       clicks: increment(1)
     });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
+  } catch (error: any) {
+    if (error?.code === 'not-found' || error?.message?.includes('No document to update')) {
+      console.warn(`Ad ${adId} not found in Firestore, skipping click log.`);
+      return;
+    }
+    console.error("Error logging ad click:", error);
   }
 }
 

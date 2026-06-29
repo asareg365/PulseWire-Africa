@@ -160,6 +160,9 @@ ${content}`;
       res.json({ summary: response.text?.trim() });
     } catch (err: any) {
       console.error('AI Summarization failed:', err);
+      if (err.status === 429 || err.message?.includes('429') || err.message?.includes('quota')) {
+        return res.status(429).json({ error: 'AI Quota Exceeded. Please try again in a minute.' });
+      }
       res.status(500).json({ error: err.message || 'AI Summarization failed' });
     }
   });
@@ -214,6 +217,9 @@ Output must be valid JSON matching this schema:
       res.json(JSON.parse(responseText));
     } catch (err: any) {
       console.error('AI SEO generation failed:', err);
+      if (err.status === 429 || err.message?.includes('429') || err.message?.includes('quota')) {
+        return res.status(429).json({ error: 'AI Quota Exceeded. Please try again in a minute.' });
+      }
       res.status(500).json({ error: err.message || 'AI SEO generation failed' });
     }
   });
@@ -243,6 +249,9 @@ ${content}`;
       res.json({ content: response.text?.trim() });
     } catch (err: any) {
       console.error('AI Rewrite failed:', err);
+      if (err.status === 429 || err.message?.includes('429') || err.message?.includes('quota')) {
+        return res.status(429).json({ error: 'AI Quota Exceeded. Please try again in a minute.' });
+      }
       res.status(500).json({ error: err.message || 'AI Rewrite failed' });
     }
   });
@@ -297,6 +306,9 @@ Output must be valid JSON matching this schema:
       res.json(JSON.parse(responseText));
     } catch (err: any) {
       console.error('AI Originality Audit failed:', err);
+      if (err.status === 429 || err.message?.includes('429') || err.message?.includes('quota')) {
+        return res.status(429).json({ error: 'AI Quota Exceeded. Please try again in a minute.' });
+      }
       res.status(500).json({ error: err.message || 'AI Originality Audit failed' });
     }
   });
@@ -364,6 +376,9 @@ Output must be valid JSON matching this schema:
       res.json(JSON.parse(response.text || '{}'));
     } catch (err: any) {
       console.error('AI Fact Check failed:', err);
+      if (err.status === 429 || err.message?.includes('429') || err.message?.includes('quota')) {
+        return res.status(429).json({ error: 'AI Quota Exceeded. Please try again in a minute.' });
+      }
       res.status(500).json({ error: err.message || 'AI Fact Checking failed' });
     }
   });
@@ -422,6 +437,9 @@ Output must be valid JSON matching this schema:
       res.json(JSON.parse(response.text || '{}'));
     } catch (err: any) {
       console.error('AI Readability & Tone analysis failed:', err);
+      if (err.status === 429 || err.message?.includes('429') || err.message?.includes('quota')) {
+        return res.status(429).json({ error: 'AI Quota Exceeded. Please try again in a minute.' });
+      }
       res.status(500).json({ error: err.message || 'AI analysis failed' });
     }
   });
@@ -483,6 +501,9 @@ Output must be valid JSON matching this schema:
       res.json(JSON.parse(response.text || '{}'));
     } catch (err: any) {
       console.error('AI Social distribution generation failed:', err);
+      if (err.status === 429 || err.message?.includes('429') || err.message?.includes('quota')) {
+        return res.status(429).json({ error: 'AI Quota Exceeded. Please try again in a minute.' });
+      }
       res.status(500).json({ error: err.message || 'AI generation failed' });
     }
   });
