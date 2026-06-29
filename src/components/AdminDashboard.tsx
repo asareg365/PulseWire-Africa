@@ -708,8 +708,14 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
       return;
     }
 
+    let authorId = editingAuthor.id;
+    if ((authorId.startsWith('author-') || !authorId) && authorEmailInput.trim()) {
+      authorId = authorEmailInput.trim().toLowerCase();
+    }
+
     const updated: Author = {
       ...editingAuthor,
+      id: authorId,
       name: authorNameInput.trim(),
       bio: authorBioInput.trim(),
       avatar: authorAvatarInput,

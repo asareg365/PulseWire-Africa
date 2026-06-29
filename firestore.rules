@@ -13,7 +13,10 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return isSignedIn() && (
+        request.auth.uid == userId || 
+        (request.auth.token.email != null && request.auth.token.email.toLowerCase() == userId.toLowerCase())
+      );
     }
 
     // Helper to query user roles from the authors collection
@@ -61,15 +64,15 @@ service cloud.firestore {
     // --- 2. Articles collection ---
     match /articles/{articleId} {
       allow read: if true;
-      // Allow write if they are a registered contributor, editor, or admin
-      allow create: if isSignedIn() && exists(/databases/$(database)/documents/authors/$(request.auth.uid));
+      // Allow write if they are signed in (with safety checks in update)
+      allow create: if isSignedIn();
       allow update: if isSignedIn() && (
         // Any registered author can increment view count or like count
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'likes']) ||
         // Only the author themselves or editors/admins can modify full contents
-        isOwner(resource.data.authorId) || isEditorOrAdmin()
+        isOwner(resource.data.authorId) || isEditorOrAdmin() || isAdminEmail()
       );
-      allow delete: if isEditorOrAdmin();
+      allow delete: if isEditorOrAdmin() || isAdminEmail();
 
       // --- Subcollection: Comments ---
       match /comments/{commentId} {

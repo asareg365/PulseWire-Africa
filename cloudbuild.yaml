@@ -1,0 +1,49 @@
+steps:
+  # 1. Build the container image
+  # By default, we use Google Container Registry (gcr.io) for a zero-configuration setup
+  # (it automatically provisions storage on the first push, unlike Artifact Registry).
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '-t', 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA',
+      '-t', 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest',
+      '.'
+    ]
+
+  # 2. Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'push',
+      'gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA'
+    ]
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'push',
+      'gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest'
+    ]
+
+  # 3. Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args: [
+      'run',
+      'deploy',
+      '$_SERVICE_NAME',
+      '--image', 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA',
+      '--region', '$_REGION',
+      '--platform', 'managed',
+      '--allow-unauthenticated'
+    ]
+
+# Images to be tracked as build artifacts
+images:
+  - 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest'
+
+# Default substitutions for easy customization
+substitutions:
+  _REGION: 'us-central1'
+  _SERVICE_NAME: 'pulsewire-news'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

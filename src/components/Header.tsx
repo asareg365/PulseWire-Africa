@@ -116,7 +116,7 @@ export default function Header({
             setProfilePassword(matched.password || '');
           } else {
             const newProfile: Author = {
-              id: `author-${Date.now()}`,
+              id: activeUser.email!.toLowerCase(),
               name: activeUser.displayName || activeUser.email!.split('@')[0],
               bio: '',
               avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&h=256&q=80',
