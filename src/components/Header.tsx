@@ -124,11 +124,12 @@ export default function Header({
             setProfileLinkedin(matched.linkedin || '');
             setProfilePassword(matched.password || '');
           } else {
+            const defaultName = activeUser.displayName || activeUser.email!.split('@')[0];
             const newProfile: Author = {
               id: activeUser.email!.toLowerCase(),
-              name: activeUser.displayName || activeUser.email!.split('@')[0],
+              name: defaultName,
               bio: '',
-              avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&h=256&q=80',
+              avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(defaultName)}&background=f1f5f9&color=dc2626&bold=true&size=256`,
               email: activeUser.email!,
               role: 'contributor',
               createdAt: new Date().toISOString(),

@@ -120,7 +120,7 @@ export async function seedDatabaseIfEmpty(force = false) {
           articleId: "seed-art-1",
           authorId: "guest",
           authorName: "Kwadwo Mensah",
-          authorAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=100&q=80",
+          authorAvatar: "https://ui-avatars.com/api/?name=Kwadwo+Mensah&background=f1f5f9&color=dc2626&bold=true&size=128",
           content: "This is brilliant! Excellent initiative by the ministry. We need more centers in Takoradi and Tamale too.",
           createdAt: "2026-06-21T12:00:00Z",
           approved: true
@@ -130,7 +130,7 @@ export async function seedDatabaseIfEmpty(force = false) {
           articleId: "seed-art-1",
           authorId: "guest",
           authorName: "Abena Boateng",
-          authorAvatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80",
+          authorAvatar: "https://ui-avatars.com/api/?name=Abena+Boateng&background=fdf2f8&color=db2777&bold=true&size=128",
           content: "As a young female developer, this is highly motivating. I will register at the Kumasi hub next week!",
           createdAt: "2026-06-21T14:30:00Z",
           approved: true
@@ -140,7 +140,7 @@ export async function seedDatabaseIfEmpty(force = false) {
           articleId: "seed-art-2",
           authorId: "guest",
           authorName: "Chinedu Okafor",
-          authorAvatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=100&q=80",
+          authorAvatar: "https://ui-avatars.com/api/?name=Chinedu+Okafor&background=f0fdf4&color=16a34a&bold=true&size=128",
           content: "PAPSS is a game changer. Doing transactions between Nigeria and Ghana has been historically ridiculous. Huge win!",
           createdAt: "2026-06-22T10:15:00Z",
           approved: true

@@ -37,9 +37,7 @@ export default function ArticleComments({ articleId, navigate }: ArticleComments
     try {
       const currentUser = auth.currentUser;
       const displayName = currentUser ? (currentUser.displayName || currentUser.email?.split('@')[0] || 'Contributor') : (name.trim() || 'Anonymous Reader');
-      const avatarUrl = currentUser 
-        ? `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80` 
-        : `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80`;
+      const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=f1f5f9&color=dc2626&bold=true&size=128`;
 
       const newComment: Comment = {
         id: `comment-${Date.now()}`,

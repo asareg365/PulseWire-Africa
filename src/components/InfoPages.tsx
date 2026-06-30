@@ -246,7 +246,7 @@ export default function InfoPages({ initialPage = 'about', onNavigate }: InfoPag
                             name: 'George Oppong Asare',
                             role: 'Founder & Editor-in-Chief',
                             bio: 'Oversees all editorial outputs and strategic growth across West Africa. Over a decade of investigative journalism experience.',
-                            avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80',
+                            avatar: 'https://ui-avatars.com/api/?name=George+Oppong+Asare&background=f1f5f9&color=dc2626&bold=true&size=256',
                             email: 'asareg365@gmail.com',
                             createdAt: ''
                           },
@@ -255,7 +255,7 @@ export default function InfoPages({ initialPage = 'about', onNavigate }: InfoPag
                             name: 'Christian Asare-Tuah',
                             role: 'Senior Policy Correspondent',
                             bio: 'Reports on macroeconomic policy, trade agreements, and energy resources across the African continent.',
-                            avatar: 'https://images.unsplash.com/photo-1531384441138-2736e62e0919?auto=format&fit=crop&w=120&h=120&q=80',
+                            avatar: 'https://ui-avatars.com/api/?name=Christian+Asare-Tuah&background=e0f2fe&color=0284c7&bold=true&size=256',
                             email: 'casaretuah@gmail.com',
                             createdAt: ''
                           }

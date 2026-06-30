@@ -101,6 +101,8 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
   const [editorTitle, setEditorTitle] = useState('');
   const [editorSummary, setEditorSummary] = useState('');
+  const [editorAuthorId, setEditorAuthorId] = useState('');
+  const [editorAuthorName, setEditorAuthorName] = useState('');
   const [editorContent, setEditorContent] = useState('');
   const [editorCategory, setEditorCategory] = useState('ghana');
   const [editorCategories, setEditorCategories] = useState<string[]>(['ghana']);
@@ -331,8 +333,8 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
       category: 'ghana',
       categories: ['ghana'],
       tags: [],
-      authorId: auth.currentUser?.uid || 'admin-pulsewire',
-      authorName: auth.currentUser?.displayName || 'Chief Editor',
+      authorId: '',
+      authorName: '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       publishedAt: new Date().toISOString(),
@@ -356,6 +358,8 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
     setEditorIsAffiliate(false);
     setEditorSponsorName('');
     setEditorAffiliateLink('');
+    setEditorAuthorId('');
+    setEditorAuthorName('');
     setPlagiarismReport(null);
   };
 
@@ -374,6 +378,8 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
     setEditorIsAffiliate(art.isAffiliate);
     setEditorSponsorName(art.sponsorName || '');
     setEditorAffiliateLink(art.affiliateLink || '');
+    setEditorAuthorId(art.authorId || '');
+    setEditorAuthorName(art.authorName || '');
     setPlagiarismReport(null);
   };
 
@@ -389,6 +395,11 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
   const handleSaveArticle = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingArticle) return;
+
+    if (!editorAuthorId) {
+      alert('Please select an author for this article before saving.');
+      return;
+    }
 
     const finalSlug = generateSlug(editorTitle);
     
@@ -414,6 +425,8 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
       isAffiliate: editorIsAffiliate,
       sponsorName: editorIsSponsored ? editorSponsorName : undefined,
       affiliateLink: editorIsAffiliate ? editorAffiliateLink : undefined,
+      authorId: editorAuthorId,
+      authorName: editorAuthorName,
       updatedAt: new Date().toISOString(),
       publishedAt: editorStatus === 'published' && editingArticle.status !== 'published' ? new Date().toISOString() : editingArticle.publishedAt
     };
@@ -721,7 +734,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
       id: `author-${Date.now()}`,
       name: '',
       bio: '',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&h=256&q=80',
+      avatar: '',
       email: '',
       role: 'contributor',
       status: 'pending',
@@ -732,7 +745,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
     });
     setAuthorNameInput('');
     setAuthorBioInput('');
-    setAuthorAvatarInput('https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&h=256&q=80');
+    setAuthorAvatarInput('');
     setAuthorEmailInput('');
     setAuthorRoleInput('contributor');
     setAuthorTwitterInput('');
@@ -766,12 +779,17 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
       authorId = authorEmailInput.trim().toLowerCase();
     }
 
+    let finalAvatar = authorAvatarInput.trim();
+    if (!finalAvatar || finalAvatar.includes('unsplash.com')) {
+      finalAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(authorNameInput.trim())}&background=f1f5f9&color=dc2626&bold=true&size=256`;
+    }
+
     const updated: Author = {
       ...editingAuthor,
       id: authorId,
       name: authorNameInput.trim(),
       bio: authorBioInput.trim(),
-      avatar: authorAvatarInput,
+      avatar: finalAvatar,
       email: authorEmailInput.trim(),
       role: authorRoleInput,
       status: editingAuthor.status || 'pending',
@@ -1232,6 +1250,32 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                 {/* Publishing State box */}
                 <div className="p-5 bg-gray-50 dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 space-y-4">
                   <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest font-mono block">Publish Settings</span>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Article Author</label>
+                    <select 
+                      value={editorAuthorId}
+                      required
+                      onChange={e => {
+                        const selectedId = e.target.value;
+                        setEditorAuthorId(selectedId);
+                        const selectedAuthor = authors.find(aut => aut.id === selectedId);
+                        if (selectedAuthor) {
+                          setEditorAuthorName(selectedAuthor.name);
+                        } else {
+                          setEditorAuthorName('');
+                        }
+                      }}
+                      className="w-full px-3 py-2 rounded bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:outline-none focus:ring-1 focus:ring-red-500 text-gray-900 dark:text-white"
+                    >
+                      <option value="">-- Select Author --</option>
+                      {authors.map(aut => (
+                        <option key={aut.id} value={aut.id}>
+                          {aut.name} ({aut.role || 'Member'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Workflow Status</label>
@@ -2721,7 +2765,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                       <div>
                         <div className="flex items-start gap-4">
                           <img 
-                            src={user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80'} 
+                            src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=f1f5f9&color=dc2626&bold=true&size=256`} 
                             alt={user.name} 
                             className="w-14 h-14 rounded-full object-cover border border-gray-200 dark:border-gray-800 shrink-0"
                             referrerPolicy="no-referrer"

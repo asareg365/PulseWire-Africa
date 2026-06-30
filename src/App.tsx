@@ -60,14 +60,8 @@ import {
 } from 'lucide-react';
 
 export function getAuthorAvatar(authorName: string): string {
-  const name = (authorName || '').toLowerCase();
-  if (name.includes('george') || name.includes('asare') || name.includes('chief') || name.includes('editor')) {
-    return "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=256&h=256&q=80";
-  }
-  if (name.includes('christian') || name.includes('tuah')) {
-    return "https://images.unsplash.com/photo-1531384441138-2736e62e0919?auto=format&fit=crop&w=256&h=256&q=80";
-  }
-  return "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80";
+  const name = (authorName || 'PulseWire Contributor').trim();
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=f1f5f9&color=dc2626&bold=true&size=256`;
 }
 
 export default function App() {
@@ -112,7 +106,7 @@ export default function App() {
           role: authRole,
           status: authRole === 'reader' ? 'approved' : 'pending',
           bio: '',
-          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80',
+          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(authName || 'User')}&background=f1f5f9&color=dc2626&bold=true&size=256`,
           createdAt: new Date().toISOString(),
         });
         navigate('/');
@@ -219,7 +213,7 @@ export default function App() {
             role: isSuperAdmin ? 'admin' : 'reader',
             status: 'approved',
             bio: '',
-            avatar: user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80',
+            avatar: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}&background=f1f5f9&color=dc2626&bold=true&size=256`,
             createdAt: new Date().toISOString(),
           };
           try {

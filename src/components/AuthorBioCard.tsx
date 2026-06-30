@@ -16,7 +16,7 @@ const AUTHOR_PROFILES: Record<string, AuthorProfile> = {
   'george oppong asare': {
     role: "Founder & Chief Editor",
     bio: "George Oppong Asare oversees all editorial operations, deep-dive investigations, and strategic bureau expansion across West Africa. He is a seasoned investigative journalist with over a decade of experience tracking economic development, public governance, and trade infrastructure on the continent.",
-    avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=256&h=256&q=80",
+    avatar: "https://ui-avatars.com/api/?name=George+Oppong+Asare&background=f1f5f9&color=dc2626&bold=true&size=256",
     email: "editor@pulsewireafrica.news",
     twitter: "GeorgeAsarePW",
     linkedin: "george-oppong-asare"
@@ -24,7 +24,7 @@ const AUTHOR_PROFILES: Record<string, AuthorProfile> = {
   'christian asare-tuah': {
     role: "Chief Administrator & Lead Editor",
     bio: "Christian manages day-to-day operations, editorial standards, and newsroom workflows. An expert in regional economic integration and development models, he ensures PulseWire's reporting remains hyper-factual, highly contextualized, and fully independent.",
-    avatar: "https://images.unsplash.com/photo-1531384441138-2736e62e0919?auto=format&fit=crop&w=256&h=256&q=80",
+    avatar: "https://ui-avatars.com/api/?name=Christian+Asare-Tuah&background=e0f2fe&color=0284c7&bold=true&size=256",
     email: "admin@pulsewireafrica.news",
     twitter: "CAT_PulseWire",
     linkedin: "christian-asare-tuah"
@@ -32,21 +32,21 @@ const AUTHOR_PROFILES: Record<string, AuthorProfile> = {
   'ama serwaa': {
     role: "Senior Tech & Business Correspondent",
     bio: "Ama reports on tech ecosystems, financial inclusion, and the startup landscape redefining West and East African commerce. With a background in financial economics, her columns analyze how digital technologies bypass traditional market barriers.",
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80",
+    avatar: "https://ui-avatars.com/api/?name=Ama+Serwaa&background=fdf2f8&color=db2777&bold=true&size=256",
     email: "ama.serwaa@pulsewireafrica.news",
     twitter: "AmaSerwaaTech"
   },
   'kofi owusu': {
     role: "Regional Politics & Governance Analyst",
     bio: "Kofi focuses on democratic transitions, election integrity, and multilateral diplomatic relationships within the ECOWAS and African Union blocs. He has covered multiple historic elections and specializes in constitutional reform policy.",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=256&h=256&q=80",
+    avatar: "https://ui-avatars.com/api/?name=Kofi+Owusu&background=f0fdf4&color=16a34a&bold=true&size=256",
     email: "kofi.owusu@pulsewireafrica.news",
     twitter: "KofiOwusuGov"
   },
   'abidemi babangida': {
     role: "Investigative Reporter & Energy Correspondent",
     bio: "Abidemi leads investigative coverage on climate policy, infrastructure funding, oil & gas concessions, and the green transition in sub-Saharan Africa. She is a recipient of several journalism awards for environmental reporting.",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=256&h=256&q=80",
+    avatar: "https://ui-avatars.com/api/?name=Abidemi+Babangida&background=fef9c3&color=ca8a04&bold=true&size=256",
     email: "abidemi.b@pulsewireafrica.news",
     twitter: "AbidemiEnergy"
   }
@@ -73,24 +73,14 @@ export function getAuthorProfileDetails(authorName: string): { name: string } & 
     return { name, ...profile };
   }
 
-  // Fallback profile
-  let avatar = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&h=256&q=80";
-  if (normalizedSearch.includes('george') || normalizedSearch.includes('asare') || normalizedSearch.includes('chief') || normalizedSearch.includes('editor')) {
-    avatar = "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=256&h=256&q=80";
-  } else if (normalizedSearch.includes('christian') || normalizedSearch.includes('tuah')) {
-    avatar = "https://images.unsplash.com/photo-1531384441138-2736e62e0919?auto=format&fit=crop&w=256&h=256&q=80";
-  } else if (normalizedSearch.includes('ama') || normalizedSearch.includes('serwaa')) {
-    avatar = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80";
-  } else if (normalizedSearch.includes('kofi') || normalizedSearch.includes('owusu')) {
-    avatar = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=256&h=256&q=80";
-  } else if (normalizedSearch.includes('abidemi') || normalizedSearch.includes('babangida')) {
-    avatar = "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=256&h=256&q=80";
-  }
+  // Fallback profile using dynamic initials
+  const nameToUse = (authorName || 'PulseWire Contributor').trim();
+  const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(nameToUse)}&background=f1f5f9&color=dc2626&bold=true&size=256`;
 
   return {
-    name: authorName || 'PulseWire Contributor',
+    name: nameToUse,
     role: "PulseWire Contributing Writer",
-    bio: `${authorName || 'This contributor'} is a dedicated journalist reporting on key developments, regional insights, and in-depth investigations for the PulseWire news bureau across Sub-Saharan Africa.`,
+    bio: `${nameToUse} is a dedicated journalist reporting on key developments, regional insights, and in-depth investigations for the PulseWire news bureau across Sub-Saharan Africa.`,
     avatar,
     email: "editorial@pulsewireafrica.news"
   };
