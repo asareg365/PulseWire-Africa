@@ -5,10 +5,12 @@ export interface Author {
   avatar: string;
   email: string;
   role: 'admin' | 'editor' | 'contributor' | string;
+  status?: 'approved' | 'pending';
   createdAt: string;
   twitter?: string;
   linkedin?: string;
   password?: string;
+  savedSlugs?: string[];
 }
 
 export interface Article {

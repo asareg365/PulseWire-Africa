@@ -15,7 +15,8 @@ import {
   seedDatabaseIfEmpty,
   getAllAuthors,
   saveAuthor,
-  deleteAuthor
+  deleteAuthor,
+  updateAuthorStatus
 } from '../lib/db';
 import { auth } from '../lib/firebase';
 import { 
@@ -51,12 +52,23 @@ import ImageEditorOverlay from './ImageEditorOverlay';
 
 interface AdminDashboardProps {
   navigate: (path: string) => void;
+  email: string;
+  role: string;
 }
 
-export default function AdminDashboard({ navigate }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'articles' | 'ads' | 'comments' | 'newsletter' | 'analytics' | 'database' | 'profiles' | 'saved'>('articles');
-  const [userRole, setUserRole] = useState<'admin' | 'editor' | 'user' | null>(null);
+export default function AdminDashboard({ navigate, email, role }: AdminDashboardProps) {
+  const [activeTab, setActiveTab] = useState<'articles' | 'ads' | 'comments' | 'newsletter' | 'analytics' | 'database' | 'profiles' | 'saved' | 'users'>('articles');
+  const [userSearchQuery, setUserSearchQuery] = useState('');
   
+  const isAdmin = ['asareg365@gmail.com', 'pulsewireafrica@gmail.com'].map(e => e.toLowerCase()).includes(email.trim().toLowerCase());
+  
+  useEffect(() => {
+    console.log('AdminDashboard debug:', { email, role, isAdmin });
+    if (!isAdmin && role !== 'admin') {
+      navigate('/');
+    }
+  }, [isAdmin, navigate, email, role]);
+
   // Database control states
   const [dbActionLoading, setDbActionLoading] = useState(false);
   const [dbMessage, setDbMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -68,6 +80,22 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
   const [authors, setAuthors] = useState<Author[]>([]);
   const [subscribers, setSubscribers] = useState<NewsletterSubscription[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const bureauAuthors = authors.filter(a => {
+    const roleLower = (a.role || '').toLowerCase();
+    return roleLower !== 'reader';
+  });
+
+  const registeredUsers = authors.filter(a => {
+    const roleLower = (a.role || '').toLowerCase() === 'reader';
+    return roleLower;
+  });
+
+  const filteredUsers = registeredUsers.filter(user => {
+    const q = userSearchQuery.trim().toLowerCase();
+    if (!q) return true;
+    return (user.name || '').toLowerCase().includes(q) || (user.email || '').toLowerCase().includes(q);
+  });
 
   // Editor states
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
@@ -175,7 +203,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
       }
       
       let role: 'admin' | 'editor' | 'user' = 'user';
-      if (activeUser.email === 'asareg365@gmail.com' || activeUser.email === 'admin@pulsewireafrica.news' || activeUser.email?.endsWith('@pulsewireafrica.news')) {
+      if (activeUser.email === 'asareg365@gmail.com' || activeUser.email === 'pulsewireafrica@gmail.com') {
         role = 'admin';
       } else {
         try {
@@ -186,8 +214,6 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
           }
         } catch(e) {}
       }
-      setUserRole(role);
-      
       if (role === 'user') {
         setActiveTab('saved');
       } else if (role === 'editor') {
@@ -698,6 +724,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=256&h=256&q=80',
       email: '',
       role: 'contributor',
+      status: 'pending',
       createdAt: new Date().toISOString(),
       twitter: '',
       linkedin: '',
@@ -747,6 +774,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
       avatar: authorAvatarInput,
       email: authorEmailInput.trim(),
       role: authorRoleInput,
+      status: editingAuthor.status || 'pending',
       twitter: authorTwitterInput.trim(),
       linkedin: authorLinkedinInput.trim(),
       password: authorPasswordInput.trim()
@@ -768,6 +796,15 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
       await loadAllAdminData();
     } catch (err: any) {
       alert(`Failed to delete author: ${err.message || err}`);
+    }
+  };
+
+  const handleApproveAuthor = async (author: Author) => {
+    try {
+      await updateAuthorStatus(author.id, 'approved');
+      await loadAllAdminData();
+    } catch (err: any) {
+      alert(`Failed to approve author: ${err.message || err}`);
     }
   };
 
@@ -1824,14 +1861,17 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
 
                 <div>
                   <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Editorial Role / Designation</label>
-                  <input 
-                    type="text" 
+                  <select 
                     required
-                    placeholder="e.g. Senior Correspondent"
                     value={authorRoleInput}
                     onChange={e => setAuthorRoleInput(e.target.value)}
                     className="w-full p-2.5 rounded bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
+                  >
+                    <option value="reader">Reader / Registered User</option>
+                    <option value="contributor">Contributor</option>
+                    <option value="editor">Editor</option>
+                    <option value="admin">Administrator</option>
+                  </select>
                 </div>
               </div>
 
@@ -2015,7 +2055,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
           Saved News
         </button>
 
-        {(userRole === 'admin' || userRole === 'editor') && (
+        {(role === 'admin' || role === 'editor') && (
           <>
             <button 
               onClick={() => setActiveTab('articles')}
@@ -2040,7 +2080,11 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
               <MessageSquare className="h-4 w-4" />
               Discussion Moderation ({comments.length})
             </button>
+          </>
+        )}
 
+        {isAdmin && (
+          <>
             <button 
               onClick={() => setActiveTab('profiles')}
               className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
@@ -2050,13 +2094,19 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
               }`}
             >
               <Users className="h-4 w-4 text-emerald-500" />
-              Bureau Profiles ({authors.length})
+              Bureau Profiles ({bureauAuthors.length})
             </button>
-          </>
-        )}
-
-        {userRole === 'admin' && (
-          <>
+            <button 
+              onClick={() => setActiveTab('users')}
+              className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
+                activeTab === 'users' 
+                  ? 'border-red-600 text-red-600' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              <Users className="h-4 w-4 text-blue-500" />
+              Registered Users ({registeredUsers.length})
+            </button>
             <button 
               onClick={() => setActiveTab('ads')}
               className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
@@ -2246,7 +2296,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
           )}
 
           {/* TAB 2: CAMPAIGN ADS */}
-          {activeTab === 'ads' && (
+          {activeTab === 'ads' && isAdmin && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest font-mono">Corporate Advertising campaigns</span>
@@ -2386,7 +2436,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
           )}
 
           {/* TAB 4: BULLETINS */}
-          {activeTab === 'newsletter' && (
+          {activeTab === 'newsletter' && isAdmin && (
             <div className="space-y-6">
               <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest font-mono block">Email Newsletter Subscriptions ({subscribers.length})</span>
 
@@ -2422,7 +2472,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
           )}
 
           {/* TAB 5: AUDIENCE ANALYTICS */}
-          {activeTab === 'analytics' && (
+          {activeTab === 'analytics' && isAdmin && (
             <div className="space-y-8">
               
               {/* Stats Grid */}
@@ -2523,7 +2573,7 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
           )}
 
           {/* TAB: BUREAU PROFILES */}
-          {activeTab === 'profiles' && (
+          {activeTab === 'profiles' && isAdmin && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest font-mono">Bureau Journalists & Editors</span>
@@ -2537,12 +2587,12 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {authors.length === 0 ? (
+                {bureauAuthors.length === 0 ? (
                   <div className="md:col-span-2 text-center py-20 border border-dashed border-gray-200 dark:border-gray-800 rounded-xl text-gray-400 font-mono bg-white dark:bg-gray-950">
                     No bureau profiles registered yet. Click Add Journalist Profile to create one.
                   </div>
                 ) : (
-                  authors.map(author => (
+                  bureauAuthors.map(author => (
                     <div key={author.id} className="border border-gray-200 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-950 p-6 space-y-4 shadow-sm flex flex-col justify-between">
                       <div>
                         <div className="flex items-start gap-4">
@@ -2554,7 +2604,12 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                           />
                           <div className="min-w-0">
                             <h4 className="font-bold text-base text-gray-900 dark:text-white font-sans">{author.name}</h4>
-                            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-mono tracking-tight font-semibold mt-0.5">{author.role}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-xs text-emerald-600 dark:text-emerald-400 font-mono tracking-tight font-semibold">{author.role}</p>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${author.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                {author.status || 'Pending'}
+                              </span>
+                            </div>
                             <p className="text-xs text-gray-400 dark:text-gray-500 font-mono truncate mt-0.5">{author.email}</p>
                           </div>
                         </div>
@@ -2585,6 +2640,15 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
                       </div>
 
                       <div className="flex items-center justify-end border-t border-gray-100 dark:border-gray-900 pt-4 mt-2 gap-2">
+                        {author.status !== 'approved' && (
+                          <button 
+                            onClick={() => handleApproveAuthor(author)} 
+                            className="px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold flex items-center gap-1 transition-all hover:bg-emerald-100"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                            Approve
+                          </button>
+                        )}
                         <button 
                           onClick={() => handleEditAuthor(author)} 
                           className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50/20 dark:hover:bg-emerald-950/10 text-gray-700 dark:text-gray-300 text-xs font-semibold flex items-center gap-1 transition-all"
@@ -2624,8 +2688,116 @@ export default function AdminDashboard({ navigate }: AdminDashboardProps) {
             </div>
           )}
 
+          {/* TAB: REGISTERED USERS */}
+          {activeTab === 'users' && isAdmin && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest font-mono">Registered Readers & subscribers</span>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mt-1">Platform Members List</h3>
+                </div>
+                
+                {/* Search Registered Users */}
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by name or email..."
+                    value={userSearchQuery}
+                    onChange={e => setUserSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {filteredUsers.length === 0 ? (
+                  <div className="md:col-span-2 text-center py-20 border border-dashed border-gray-200 dark:border-gray-800 rounded-xl text-gray-400 font-mono bg-white dark:bg-gray-950">
+                    {userSearchQuery.trim() ? "No registered users match your search." : "No registered users on the platform yet."}
+                  </div>
+                ) : (
+                  filteredUsers.map(user => (
+                    <div key={user.id} className="border border-gray-200 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-950 p-6 space-y-4 shadow-sm flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-start gap-4">
+                          <img 
+                            src={user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80'} 
+                            alt={user.name} 
+                            className="w-14 h-14 rounded-full object-cover border border-gray-200 dark:border-gray-800 shrink-0"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-base text-gray-900 dark:text-white font-sans">{user.name}</h4>
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-xs text-blue-600 dark:text-blue-400 font-mono tracking-tight font-semibold">Reader / Member</p>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${user.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                {user.status || 'approved'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-400 dark:text-gray-500 font-mono truncate mt-0.5">{user.email}</p>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-sans mt-4 line-clamp-3">
+                          {user.bio || 'This member has not written a biography yet.'}
+                        </p>
+
+                        <div className="text-[10px] font-mono text-gray-400 mt-3 pt-1">
+                          Registered: {user.createdAt ? new Date(user.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'Unknown'}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end border-t border-gray-100 dark:border-gray-900 pt-4 mt-2 gap-2">
+                        {user.status !== 'approved' && (
+                          <button 
+                            onClick={() => handleApproveAuthor(user)} 
+                            className="px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold flex items-center gap-1 transition-all hover:bg-emerald-100"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                            Approve
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => handleEditAuthor(user)} 
+                          className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50/20 dark:hover:bg-blue-950/10 text-gray-700 dark:text-gray-300 text-xs font-semibold flex items-center gap-1 transition-all"
+                        >
+                          <Edit className="h-3.5 w-3.5 text-blue-600" />
+                          Manage Role / Edit
+                        </button>
+                        {deleteConfirmId === `author_${user.id}` ? (
+                          <div className="flex gap-1">
+                            <button 
+                              onClick={() => handleDeleteAuthor(user.id)} 
+                              className="px-3 py-1.5 rounded-lg border border-red-600 bg-red-600 text-white text-xs font-semibold transition-all hover:bg-red-700"
+                            >
+                              Confirm
+                            </button>
+                            <button 
+                              onClick={() => setDeleteConfirmId(null)} 
+                              className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold transition-all hover:bg-gray-200 dark:hover:bg-gray-700"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => setDeleteConfirmId(`author_${user.id}`)} 
+                            className="px-3 py-1.5 rounded-lg border border-red-100 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-1 transition-all"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
           {/* TAB 6: DATABASE ADMINISTRATION */}
-          {activeTab === 'database' && (
+          {activeTab === 'database' && isAdmin && (
             <div className="space-y-6">
               <div className="p-6 rounded-2xl bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 shadow-sm space-y-6">
                 <div>

@@ -56,7 +56,9 @@ service cloud.firestore {
     // --- 2. Articles collection ---
     match /articles/{articleId} {
       allow read: if true;
-      allow write: if true; // Temporarily allow writes
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
 
       // --- Subcollection: Comments ---
       match /comments/{commentId} {

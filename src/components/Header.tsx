@@ -267,7 +267,7 @@ export default function Header({
           </button>
 
           {/* Dashboard Shortcut */}
-          {isAdmin && (
+          {activeUser && (
             <button 
               onClick={() => navigate('/admin')}
               className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors border ${
@@ -386,7 +386,7 @@ export default function Header({
           onClick={(e) => e.stopPropagation()}
           id="mobile-drawer-content"
         >
-          {isAdmin && (
+          {activeUser && (
             <button 
               onClick={() => { navigate('/admin'); setShowMobileMenu(false); }}
               className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 font-bold uppercase text-xs tracking-wider"

@@ -6,9 +6,10 @@ import { Send, User, MessageSquare, Check, ShieldAlert } from 'lucide-react';
 
 interface ArticleCommentsProps {
   articleId: string;
+  navigate: (path: string) => void;
 }
 
-export default function ArticleComments({ articleId }: ArticleCommentsProps) {
+export default function ArticleComments({ articleId, navigate }: ArticleCommentsProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [name, setName] = useState('');
   const [text, setText] = useState('');
@@ -85,6 +86,11 @@ export default function ArticleComments({ articleId }: ArticleCommentsProps) {
           </div>
         ) : (
           <form onSubmit={handleSubmitComment} className="space-y-4">
+            {!auth.currentUser && (
+              <div className="mb-4 p-3 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300 text-xs rounded-lg border border-emerald-100 dark:border-emerald-900/30">
+                Commenting anonymously? <button onClick={() => navigate('/login')} className="font-bold underline">Create an account</button> to save your preferences and manage comments.
+              </div>
+            )}
             {!auth.currentUser && (
               <div>
                 <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Your Name</label>

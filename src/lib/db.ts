@@ -45,6 +45,7 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
+  console.log('Firebase Auth Current User:', auth.currentUser);
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -592,6 +593,17 @@ export async function deleteAuthor(authorId: string): Promise<void> {
     await deleteDoc(doc(db, 'authors', authorId));
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+// Update author status (for approval workflow)
+export async function updateAuthorStatus(authorId: string, status: 'approved' | 'pending'): Promise<void> {
+  const path = `authors/${authorId}`;
+  try {
+    const docRef = doc(db, 'authors', authorId);
+    await updateDoc(docRef, { status });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
   }
 }
 

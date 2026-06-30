@@ -261,7 +261,11 @@ export default function InfoPages({ initialPage = 'about', onNavigate }: InfoPag
                           }
                         ];
 
-                        const displayAuthors = authors.length > 0 ? authors : fallbackAuthors;
+                        const filteredAuthors = authors.filter(author => {
+                          const roleLower = (author.role || '').toLowerCase();
+                          return !['reader', 'contributor', 'editor'].includes(roleLower);
+                        });
+                        const displayAuthors = filteredAuthors.length > 0 ? filteredAuthors : fallbackAuthors;
 
                         return displayAuthors.map((author) => (
                           <div key={author.id} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-slate-100 dark:border-slate-900 rounded-xl bg-white dark:bg-slate-950/40">

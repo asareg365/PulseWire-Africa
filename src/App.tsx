@@ -9,11 +9,13 @@ import {
   seedDatabaseIfEmpty, 
   clearAllDatabaseData,
   getActiveAds,
-  subscribeNewsletter
+  subscribeNewsletter,
+  saveAuthor,
+  getAuthorById
 } from './lib/db';
 import { auth } from './lib/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { Article, CATEGORIES } from './types';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { Article, CATEGORIES, Author } from './types';
 import Header from './components/Header';
 import Logo from './components/Logo';
 import NewsImage, { ImageGallery } from './components/NewsImage';
@@ -22,6 +24,8 @@ import Footer from './components/Footer';
 import AdSenseBanner from './components/AdSenseBanner';
 import ArticleComments from './components/ArticleComments';
 import AdminDashboard from './components/AdminDashboard';
+import ContributorDashboard from './components/ContributorDashboard';
+import ReaderDashboard from './components/ReaderDashboard';
 import InfoPages from './components/InfoPages';
 import AuthorBioCard from './components/AuthorBioCard';
 import { 
@@ -84,9 +88,11 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authName, setAuthName] = useState('');
+  const [authRole, setAuthRole] = useState<'reader' | 'contributor' | 'editor'>('reader');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [showForgotPasswordPrompt, setShowForgotPasswordPrompt] = useState(false);
+  const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false);
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +104,17 @@ export default function App() {
 
     try {
       if (isSignUp) {
-        await createUserWithEmailAndPassword(auth, emailToUse, passwordToUse);
+        const userCredential = await createUserWithEmailAndPassword(auth, emailToUse, passwordToUse);
+        await saveAuthor({
+          id: userCredential.user.uid,
+          name: authName,
+          email: emailToUse,
+          role: authRole,
+          status: authRole === 'reader' ? 'approved' : 'pending',
+          bio: '',
+          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80',
+          createdAt: new Date().toISOString(),
+        });
         navigate('/');
       } else {
         try {
@@ -180,28 +196,76 @@ export default function App() {
   const [dbReady, setDbReady] = useState(false);
 
   // Saved articles state
-  const [savedSlugs, setSavedSlugs] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('saved_articles');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [savedSlugs, setSavedSlugs] = useState<string[]>([]);
+  const [currentUserAuthor, setCurrentUserAuthor] = useState<any>(null);
+  const [allArticles, setAllArticles] = useState<Article[]>([]);
 
-  // Sync to localStorage
   useEffect(() => {
-    localStorage.setItem('saved_articles', JSON.stringify(savedSlugs));
-  }, [savedSlugs]);
+    getAllArticles().then(setAllArticles);
+  }, []);
 
-  const toggleSaveArticle = (slug: string) => {
-    setSavedSlugs(prev => {
-      if (prev.includes(slug)) {
-        return prev.filter(s => s !== slug);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        let author = await getAuthorById(user.uid);
+        if (!author) {
+          const isSuperAdmin = ['asareg365@gmail.com', 'pulsewireafrica@gmail.com'].map(e => e.toLowerCase()).includes(user.email?.trim().toLowerCase() || '');
+          const newAuthor: Author = {
+            id: user.uid,
+            name: user.displayName || user.email?.split('@')[0] || 'User',
+            email: user.email || '',
+            role: isSuperAdmin ? 'admin' : 'reader',
+            status: 'approved',
+            bio: '',
+            avatar: user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80',
+            createdAt: new Date().toISOString(),
+          };
+          try {
+            await saveAuthor(newAuthor);
+            author = newAuthor;
+          } catch (e) {
+            console.error("Error auto-creating author profile:", e);
+          }
+        }
+        if (author) {
+          setCurrentUserAuthor(author);
+          setSavedSlugs(author.savedSlugs || []);
+          
+          // Sync isAdmin based on email for header shortcut immediately on load
+          const isSuperAdmin = ['asareg365@gmail.com', 'pulsewireafrica@gmail.com'].map(e => e.toLowerCase()).includes(user.email?.trim().toLowerCase() || '');
+          setIsAdmin(isSuperAdmin);
+        }
       } else {
-        return [...prev, slug];
+        setCurrentUserAuthor(null);
+        setSavedSlugs([]);
+        setIsAdmin(false);
       }
+      setAuthChecked(true);
     });
+    return unsubscribe;
+  }, []);
+
+  const toggleSaveArticle = async (slug: string) => {
+    if (!auth.currentUser) {
+      navigate('/login');
+      return;
+    }
+    
+    let newSavedSlugs = [...savedSlugs];
+    if (newSavedSlugs.includes(slug)) {
+      newSavedSlugs = newSavedSlugs.filter(s => s !== slug);
+    } else {
+      newSavedSlugs.push(slug);
+    }
+    setSavedSlugs(newSavedSlugs);
+    
+    if (currentUserAuthor) {
+      const updatedAuthor = { ...currentUserAuthor, savedSlugs: newSavedSlugs };
+      await saveAuthor(updatedAuthor);
+      setCurrentUserAuthor(updatedAuthor);
+    }
   };
 
   // Saved articles selector
@@ -466,6 +530,55 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Auto-logout after 30 minutes of inactivity
+  useEffect(() => {
+    if (!currentUserAuthor) return;
+
+    const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in ms
+    let timeoutId: NodeJS.Timeout;
+
+    const handleLogout = async () => {
+      try {
+        await signOut(auth);
+        setCurrentUserAuthor(null);
+        setSavedSlugs([]);
+        setIsAdmin(false);
+        setShowSessionExpiredModal(true);
+        navigate('/login');
+      } catch (err) {
+        console.error("Error during automatic logout due to inactivity:", err);
+      }
+    };
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(handleLogout, INACTIVITY_TIMEOUT);
+    };
+
+    // Listen to user interaction events across the window
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    events.forEach(event => {
+      window.addEventListener(event, resetTimer, { passive: true });
+    });
+
+    // Initialize timer
+    resetTimer();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [currentUserAuthor, navigate]);
+
+  useEffect(() => {
+    if (authChecked && currentPath === '/admin' && !auth.currentUser) {
+      navigate('/login');
+    }
+  }, [authChecked, currentPath, navigate]);
+
   const handleRouting = async (path: string) => {
     setLoading(true);
     
@@ -694,7 +807,7 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         <AnimatePresence mode="wait">
-          {!dbReady || loading ? (
+          {!dbReady || loading || !authChecked || (auth.currentUser && !currentUserAuthor) ? (
             <motion.div 
               key="skeleton-loader"
               initial={{ opacity: 0 }}
@@ -1569,7 +1682,7 @@ export default function App() {
                     )}
 
                     {/* Comments Discussion panel */}
-                    <ArticleComments articleId={selectedArticle.id} />
+                    <ArticleComments articleId={selectedArticle.id} navigate={navigate} />
 
                   </div>
 
@@ -1736,6 +1849,21 @@ export default function App() {
                         </div>
                       )}
 
+                      {isSignUp && (
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-1 font-mono">Role</label>
+                          <select 
+                            value={authRole} 
+                            onChange={e => setAuthRole(e.target.value as any)}
+                            className="w-full px-3 py-2.5 text-sm rounded-lg border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          >
+                            <option value="reader">Reader</option>
+                            <option value="contributor">Contributor</option>
+                            <option value="editor">Editor</option>
+                          </select>
+                        </div>
+                      )}
+
                       <div>
                         <label className="block text-xs font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-1 font-mono">Email Address</label>
                         <input 
@@ -1817,8 +1945,22 @@ export default function App() {
               )}
 
               {/* --- ROUTE 5: ADMIN DASHBOARD PANEL --- */}
-              {currentPath === '/admin' && (
-                <AdminDashboard navigate={navigate} />
+              {currentPath === '/admin' && currentUserAuthor && (
+                (currentUserAuthor.role === 'admin' || ['asareg365@gmail.com', 'pulsewireafrica@gmail.com'].map(e => e.toLowerCase()).includes(currentUserAuthor.email?.trim().toLowerCase() || '')) ? (
+                  <AdminDashboard 
+                    navigate={navigate} 
+                    email={currentUserAuthor?.email || ''}
+                    role={currentUserAuthor?.role || 'admin'}
+                  />
+                ) : (currentUserAuthor.role === 'editor' || currentUserAuthor.role === 'contributor') ? (
+                  <ContributorDashboard navigate={navigate} />
+                ) : (
+                  <ReaderDashboard 
+                    navigate={navigate} 
+                    savedArticles={allArticles.filter(a => savedSlugs.includes(a.slug))} 
+                    toggleSaveArticle={toggleSaveArticle} 
+                  />
+                )
               )}
 
               {/* --- ROUTE 6: CORPORATE & LEGAL INFO PAGES --- */}
@@ -1946,6 +2088,38 @@ export default function App() {
               </form>
             )}
           </motion.div>
+        )}
+
+        {showSessionExpiredModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="max-w-md w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xl text-center space-y-4"
+            >
+              <div className="mx-auto w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                <Clock className="h-6 w-6" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white font-sans">
+                  Session Expired
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-sans">
+                  For your security, you have been automatically logged out due to 30 minutes of inactivity. Please sign in again to resume your session.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowSessionExpiredModal(false);
+                  navigate('/login');
+                }}
+                className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
+              >
+                Sign In Again
+              </button>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
