@@ -20,6 +20,53 @@ interface AIAd {
   themeColor: string;
 }
 
+function getFallbackAd(type: string, category?: string): AIAd {
+  const normCategory = (category || '').toLowerCase();
+  
+  if (normCategory.includes('tech') || normCategory.includes('startups') || normCategory.includes('digital') || normCategory.includes('software')) {
+    return {
+      title: 'Accept Payments Anywhere on Earth',
+      advertiser: 'Paystack Africa',
+      description: 'Modern, secure payment APIs designed for startups, small businesses, and enterprise platforms across Nigeria, Ghana, and Kenya.',
+      link: 'https://paystack.com',
+      ctaText: 'Get Started',
+      imageUrl: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=600&q=80',
+      themeColor: 'sky'
+    };
+  } else if (normCategory.includes('sport') || normCategory.includes('football')) {
+    return {
+      title: 'Premium Sportswear & Training Kits',
+      advertiser: 'Puma West Africa',
+      description: 'Step up your speed and agility on the field with Puma premium running gear and custom athletic sportswear.',
+      link: 'https://puma.com',
+      ctaText: 'Shop Now',
+      imageUrl: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=600&q=80',
+      themeColor: 'amber'
+    };
+  } else if (normCategory.includes('lifestyle') || normCategory.includes('entertainment') || normCategory.includes('travel')) {
+    return {
+      title: 'Fly Accra to London with Virgin',
+      advertiser: 'Virgin Atlantic',
+      description: 'Experience ultra-premium economy seats, luxury pre-flight lounges, and top-tier hospitality on daily direct flights.',
+      link: 'https://virginatlantic.com',
+      ctaText: 'Book Flight',
+      imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
+      themeColor: 'rose'
+    };
+  }
+  
+  // Default general fallback
+  return {
+    title: 'Premium Financial Solutions for Africa',
+    advertiser: 'Standard Chartered Africa',
+    description: 'Grow and secure your wealth with our tailored wealth management and checking accounts across West Africa.',
+    link: 'https://sc.com/africa',
+    ctaText: 'Learn More',
+    imageUrl: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=600&q=80',
+    themeColor: 'emerald'
+  };
+}
+
 export default function AdSenseBanner({ type, contextTitle, contextCategory, contextTags }: AdSenseBannerProps) {
   const [dbAd, setDbAd] = useState<AdPlacement | null>(null);
   const [aiAd, setAiAd] = useState<AIAd | null>(null);
@@ -50,27 +97,34 @@ export default function AdSenseBanner({ type, contextTitle, contextCategory, con
         } else {
           // If no active campaign matches, load dynamic AI-generated contextual ad!
           setDbAd(null);
-          const response = await fetch('/api/ai/ads/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              title: contextTitle || '',
-              category: contextCategory || '',
-              tags: contextTags || [],
-              type
-            })
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            setAiAd(data);
-          } else {
-            console.error('Failed to fetch AI ad creative, response not ok');
+          try {
+            const response = await fetch('/api/ai/campaigns/generate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title: contextTitle || '',
+                category: contextCategory || '',
+                tags: contextTags || [],
+                type
+              })
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              setAiAd(data);
+            } else {
+              console.warn('Utilizing fallback dynamic ad');
+              setAiAd(getFallbackAd(type, contextCategory));
+            }
+          } catch (fetchErr) {
+            console.warn('Generation blocked or network error, using fallback');
+            setAiAd(getFallbackAd(type, contextCategory));
           }
           setLoading(false);
         }
       } catch (err) {
-        console.error('Failed to load ad slot:', err);
+        console.warn('Failed to load ad slot, utilizing fallback:', err);
+        setAiAd(getFallbackAd(type, contextCategory));
         setLoading(false);
       }
     }

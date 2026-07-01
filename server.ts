@@ -512,7 +512,7 @@ Output must be valid JSON matching this schema:
   const adCache = new Map<string, any>();
 
   // 4e. AI Dynamic Content-Driven Sponsored Ad Generator
-  app.post('/api/ai/ads/generate', async (req, res) => {
+  app.post('/api/ai/campaigns/generate', async (req, res) => {
     try {
       const { title = '', category = '', tags = [], type = 'sidebar' } = req.body;
       
