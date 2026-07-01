@@ -158,18 +158,18 @@ export default function Logo({ variant = 'header', className = '' }: LogoProps) 
 
   // Header default variant: Horizontal layout optimized for the top navigation bar
   return (
-    <div className={`flex items-center space-x-3 cursor-pointer ${className}`} id="logo-header">
+    <div className={`flex items-center space-x-2 sm:space-x-3 cursor-pointer ${className}`} id="logo-header">
       {/* Emblem graphic */}
-      <div className="w-11 h-9 sm:w-12 sm:h-10 shrink-0">
+      <div className="w-9 h-7 sm:w-12 sm:h-10 shrink-0">
         <LogoMark />
       </div>
       
       {/* Lettering and Tagline */}
       <div className="flex flex-col justify-center">
-        <span className="text-lg sm:text-xl font-black tracking-tighter text-slate-900 dark:text-white font-sans flex items-center leading-none">
-          PULSE<span className="text-red-600">WIRE</span><span className="text-slate-400 dark:text-slate-500 font-normal text-sm sm:text-base ml-1 tracking-wider">AFRICA</span>
+        <span className="text-base sm:text-xl font-black tracking-tighter text-slate-900 dark:text-white font-sans flex items-center leading-none">
+          PULSE<span className="text-red-600">WIRE</span><span className="hidden min-[400px]:inline text-slate-400 dark:text-slate-500 font-normal text-xs sm:text-base ml-1 tracking-wider">AFRICA</span>
         </span>
-        <span className="text-[9px] sm:text-[10px] text-emerald-600 dark:text-emerald-400 font-bold tracking-wide mt-0.5 whitespace-nowrap">
+        <span className="hidden sm:block text-[9px] sm:text-[10px] text-emerald-600 dark:text-emerald-400 font-bold tracking-wide mt-0.5 whitespace-nowrap">
           Connecting Africa to the World&apos;s Stories
         </span>
       </div>

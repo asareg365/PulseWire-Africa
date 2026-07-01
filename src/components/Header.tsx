@@ -26,6 +26,7 @@ import {
 import { CATEGORIES, Author } from '../types';
 import Logo from './Logo';
 import { getAllAuthors, saveAuthor } from '../lib/db';
+import ThemeToggle from './ThemeToggle';
 
 interface HeaderProps {
   currentPath: string;
@@ -233,39 +234,8 @@ export default function Header({
             <Search className="h-5 w-5" />
           </button>
 
-          {/* Dark / Light Mode Trigger */}
-          <button 
-            onClick={() => setDarkMode(!darkMode)}
-            className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center w-9 h-9 relative overflow-hidden"
-            aria-label="Toggle dark mode"
-            id="btn-dark-mode"
-          >
-            <AnimatePresence mode="wait" initial={false}>
-              {darkMode ? (
-                <motion.div
-                  key="sun"
-                  initial={{ rotate: -90, scale: 0, opacity: 0 }}
-                  animate={{ rotate: 0, scale: 1, opacity: 1 }}
-                  exit={{ rotate: 90, scale: 0, opacity: 0 }}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                  className="flex items-center justify-center"
-                >
-                  <Sun className="h-5 w-5 text-amber-500 fill-amber-500/20" />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="moon"
-                  initial={{ rotate: 90, scale: 0, opacity: 0 }}
-                  animate={{ rotate: 0, scale: 1, opacity: 1 }}
-                  exit={{ rotate: -90, scale: 0, opacity: 0 }}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                  className="flex items-center justify-center"
-                >
-                  <Moon className="h-5 w-5 text-slate-600 fill-slate-600/15" />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </button>
+          {/* Global Theme Toggle */}
+          <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
 
           {/* Dashboard Shortcut */}
           {activeUser && (
@@ -383,7 +353,7 @@ export default function Header({
     {showMobileMenu && (
       <div className="fixed inset-0 top-16 z-[100] bg-gray-950/60 backdrop-blur-sm md:hidden" onClick={() => setShowMobileMenu(false)}>
         <div 
-          className="w-4/5 max-w-sm h-full bg-white opacity-100 dark:bg-gray-950 dark:opacity-100 p-6 flex flex-col space-y-6 shadow-2xl transition-transform duration-300 relative z-[101]"
+          className="w-4/5 max-w-sm h-full bg-white opacity-100 dark:bg-gray-950 dark:opacity-100 p-6 flex flex-col space-y-6 shadow-2xl transition-transform duration-300 relative z-[101] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
           id="mobile-drawer-content"
         >
@@ -453,6 +423,15 @@ export default function Header({
               </button>
             </div>
           )}
+
+          {/* Mobile Preferences & Theme Toggle */}
+          <div className="border-t border-slate-100 dark:border-gray-900 pt-4 flex flex-col space-y-3">
+            <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest font-mono">Preferences</span>
+            <div className="flex items-center justify-between px-3">
+              <span className="text-sm font-semibold text-slate-700 dark:text-gray-300">Theme Preference</span>
+              <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
+            </div>
+          </div>
         </div>
       </div>
     )}

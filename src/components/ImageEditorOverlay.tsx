@@ -262,7 +262,7 @@ export default function ImageEditorOverlay({
     >
       <div 
         id="image-editor-modal"
-        className="w-full max-w-5xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden border border-slate-200 dark:border-slate-800 max-h-[90vh]"
+        className="w-full max-w-5xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-y-auto md:overflow-hidden border border-slate-200 dark:border-slate-800 max-h-[95vh] md:max-h-[90vh]"
       >
         
         {/* Left/Top Panel: Canvas Viewport */}
