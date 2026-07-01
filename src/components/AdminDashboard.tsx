@@ -341,6 +341,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
       status: 'draft',
       views: 0,
       likes: 0,
+      shareCount: 0,
       isSponsored: false,
       isAffiliate: false
     });

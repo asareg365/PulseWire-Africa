@@ -743,11 +743,11 @@ Output must be a valid JSON object matching this schema:
 
       // Strip existing title and meta tags that we are going to dynamically override
       html = html.replace(/<title>[\s\S]*?<\/title>/gi, '');
-      html = html.replace(/<meta\s+name="title"[\s\S]*?\/>/gi, '');
-      html = html.replace(/<meta\s+name="description"[\s\S]*?\/>/gi, '');
-      html = html.replace(/<meta\s+property="og:[\s\S]*?\/>/gi, '');
-      html = html.replace(/<meta\s+property="twitter:[\s\S]*?\/>/gi, '');
-      html = html.replace(/<meta\s+name="twitter:[\s\S]*?\/>/gi, '');
+      html = html.replace(/<meta\s+name="title"[\s\S]*?\/?>/gi, '');
+      html = html.replace(/<meta\s+name="description"[\s\S]*?\/?>/gi, '');
+      html = html.replace(/<meta\s+property="og:[\s\S]*?\/?>/gi, '');
+      html = html.replace(/<meta\s+property="twitter:[\s\S]*?\/?>/gi, '');
+      html = html.replace(/<meta\s+name="twitter:[\s\S]*?\/?>/gi, '');
 
       // Structured Schema Markup
       const schemaMarkup = {
@@ -777,11 +777,11 @@ Output must be a valid JSON object matching this schema:
     <!-- PulseWire Africa Dynamic SEO SSR -->
     <title>${articleData.title} | PulseWire Africa</title>
     <meta name="description" content="${articleData.summary.replace(/"/g, '&quot;')}" />
-    <link rel="canonical" href="${process.env.APP_URL || 'https://pulsewireafrica-152570020464.us-west2.run.app'}/article/${slug}" />
+    <link rel="canonical" href="${process.env.APP_URL || 'https://pulsewireafrica-152570020464.us-central1.run.app'}/article/${slug}" />
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="article" />
-    <meta property="og:url" content="${process.env.APP_URL || 'https://pulsewireafrica-152570020464.us-west2.run.app'}/article/${slug}" />
+    <meta property="og:url" content="${process.env.APP_URL || 'https://pulsewireafrica-152570020464.us-central1.run.app'}/article/${slug}" />
     <meta property="og:title" content="${articleData.title.replace(/"/g, '&quot;')}" />
     <meta property="og:description" content="${articleData.summary.replace(/"/g, '&quot;')}" />
     <meta property="og:image" content="${articleData.featuredImage}" />
@@ -835,7 +835,7 @@ Output must be a valid JSON object matching this schema:
         }
       }
 
-      const appUrl = process.env.APP_URL || 'https://pulsewireafrica-152570020464.us-west2.run.app';
+      const appUrl = process.env.APP_URL || 'https://pulsewireafrica-152570020464.us-central1.run.app';
       const categories = ['ghana', 'africa', 'world', 'sports', 'football', 'business', 'technology', 'entertainment', 'health', 'lifestyle'];
 
       let xml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -885,7 +885,7 @@ Output must be a valid JSON object matching this schema:
 
   // --- Dynamic Robots.txt ---
   app.get('/robots.txt', (req, res) => {
-    const appUrl = process.env.APP_URL || 'https://pulsewireafrica-152570020464.us-west2.run.app';
+    const appUrl = process.env.APP_URL || 'https://pulsewireafrica-152570020464.us-central1.run.app';
     const content = `User-agent: *
 Allow: /
 Disallow: /admin

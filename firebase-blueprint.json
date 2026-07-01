@@ -36,6 +36,7 @@
         "status": { "type": "string", "enum": ["draft", "published", "scheduled"] },
         "views": { "type": "number" },
         "likes": { "type": "number" },
+        "shareCount": { "type": "number" },
         "isSponsored": { "type": "boolean" },
         "isAffiliate": { "type": "boolean" }
       },

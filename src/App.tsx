@@ -6,6 +6,7 @@ import {
   getArticleBySlug, 
   incrementArticleViews, 
   incrementArticleLikes,
+  incrementArticleShares,
   seedDatabaseIfEmpty, 
   clearAllDatabaseData,
   getActiveAds,
@@ -651,6 +652,16 @@ export default function App() {
     }
   };
 
+  const handleShareArticle = async () => {
+    if (!selectedArticle) return;
+    try {
+      await incrementArticleShares(selectedArticle.id);
+      setSelectedArticle(prev => prev ? { ...prev, shareCount: (prev.shareCount || 0) + 1 } : null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // Structured related articles fetching (in-category)
   const relatedArticles = useMemo(() => {
     if (!selectedArticle || articles.length === 0) return [];
@@ -727,6 +738,7 @@ export default function App() {
     navigator.clipboard.writeText(url);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
+    handleShareArticle();
   };
 
   // Handle native Web Share API for mobile/desktop
@@ -740,6 +752,7 @@ export default function App() {
           text: `Check out this article on PulseWire Africa: "${title}"`,
           url,
         });
+        handleShareArticle();
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
           handleCopyShareLink();
@@ -1555,7 +1568,7 @@ export default function App() {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
                           <h4 className="text-xs font-black text-slate-950 dark:text-white uppercase tracking-wider font-mono flex items-center gap-2">
-                            Spread the coverage
+                            Spread the coverage ({selectedArticle.shareCount || 0} shares)
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                           </h4>
                           <p className="text-[11px] text-slate-500 dark:text-gray-400 mt-0.5">
@@ -1578,6 +1591,7 @@ export default function App() {
                           href={`https://api.whatsapp.com/send?text=${encodeURIComponent(selectedArticle.title + " - " + window.location.href)}`}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={handleShareArticle}
                           className="flex items-center gap-2 px-3.5 py-2 bg-[#25D366] hover:bg-[#20ba5a] text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm hover:shadow cursor-pointer"
                         >
                           <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
@@ -1591,6 +1605,7 @@ export default function App() {
                           href={`https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(selectedArticle.title)}`}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={handleShareArticle}
                           className="flex items-center gap-2 px-3.5 py-2 bg-[#229ED9] hover:bg-[#1d8fc5] text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm hover:shadow cursor-pointer"
                         >
                           <svg className="w-4.5 h-4.5 fill-current" viewBox="0 0 24 24">
@@ -1604,6 +1619,7 @@ export default function App() {
                           href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(selectedArticle.title)}&url=${encodeURIComponent(window.location.href)}`}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={handleShareArticle}
                           className="flex items-center gap-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-black dark:hover:bg-neutral-200 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm hover:shadow cursor-pointer"
                         >
                           <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
@@ -1617,6 +1633,7 @@ export default function App() {
                           href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={handleShareArticle}
                           className="flex items-center gap-2 px-3.5 py-2 bg-[#1877F2] hover:bg-[#166fe5] text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm hover:shadow cursor-pointer"
                         >
                           <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">

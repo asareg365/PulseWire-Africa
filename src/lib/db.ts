@@ -298,6 +298,19 @@ export async function incrementArticleLikes(articleId: string) {
   }
 }
 
+// Increment article social shares count
+export async function incrementArticleShares(articleId: string) {
+  const path = `articles/${articleId}`;
+  try {
+    const docRef = doc(db, 'articles', articleId);
+    await updateDoc(docRef, {
+      shareCount: increment(1)
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
 // Helper to recursively remove undefined values before writing to Firestore
 function cleanUndefined<T>(obj: T): T {
   if (obj === null || obj === undefined) {

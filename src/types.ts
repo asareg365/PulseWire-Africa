@@ -32,6 +32,7 @@ export interface Article {
   status: 'draft' | 'published' | 'scheduled';
   views: number;
   likes: number;
+  shareCount?: number;
   isSponsored: boolean;
   isAffiliate: boolean;
   sponsorName?: string;
