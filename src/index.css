@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 /* Smooth theme transition for color, backgrounds, borders and shadows */
 *, *::before, *::after {
   transition-property: background-color, border-color, color, fill, stroke, box-shadow, text-decoration-color;
