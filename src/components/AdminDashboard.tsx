@@ -106,6 +106,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
   const [editorContent, setEditorContent] = useState('');
   const [editorCategory, setEditorCategory] = useState('ghana');
   const [editorCategories, setEditorCategories] = useState<string[]>(['ghana']);
+  const [editorSubCategory, setEditorSubCategory] = useState('');
   const [editorTags, setEditorTags] = useState('');
   const [editorFeaturedImage, setEditorFeaturedImage] = useState('');
   const [editorImages, setEditorImages] = useState<string[]>([]);
@@ -328,7 +329,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
       slug: '',
       summary: '',
       content: '',
-      featuredImage: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80',
+      featuredImage: '',
       images: [],
       category: 'ghana',
       categories: ['ghana'],
@@ -351,8 +352,9 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
     setEditorContent('');
     setEditorCategory('ghana');
     setEditorCategories(['ghana']);
+    setEditorSubCategory('');
     setEditorTags('');
-    setEditorFeaturedImage('https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80');
+    setEditorFeaturedImage('');
     setEditorImages([]);
     setEditorStatus('draft');
     setEditorIsSponsored(false);
@@ -371,6 +373,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
     setEditorContent(art.content);
     setEditorCategory(art.category);
     setEditorCategories(art.categories || (art.category ? [art.category] : ['ghana']));
+    setEditorSubCategory(art.subCategory || '');
     setEditorTags(art.tags.join(', '));
     setEditorFeaturedImage(art.featuredImage);
     setEditorImages(art.images || []);
@@ -418,6 +421,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
       content: editorContent,
       category: editorCategories[0] || 'ghana',
       categories: editorCategories,
+      subCategory: editorSubCategory,
       tags: editorTags.split(',').map(t => t.trim()).filter(Boolean),
       featuredImage: editorFeaturedImage,
       images: editorImages,
@@ -672,7 +676,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
       id: `ad-${Date.now()}`,
       title: '',
       type: 'banner',
-      imageUrl: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1200&q=80',
+      imageUrl: '/logo-wide.svg',
       link: 'https://example.com',
       active: true,
       impressions: 0,
@@ -680,7 +684,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
     });
     setAdTitle('');
     setAdType('banner');
-    setAdImageUrl('https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1200&q=80');
+    setAdImageUrl('/logo-wide.svg');
     setAdLink('https://example.com');
     setAdActive(true);
   };
@@ -1333,6 +1337,17 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                         );
                       })}
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Sub Category</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Local Governance, Elections, Tech Startups"
+                      value={editorSubCategory}
+                      onChange={e => setEditorSubCategory(e.target.value)}
+                      className="w-full px-3 py-2 rounded bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm text-gray-900 dark:text-white"
+                    />
                   </div>
 
                   <div>
@@ -2281,6 +2296,11 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                                   </span>
                                 );
                               })}
+                              {art.subCategory && (
+                                <span className="bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50 px-1.5 py-0.5 rounded text-[10px] font-bold capitalize">
+                                  {art.subCategory}
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="p-4 text-xs text-gray-600 dark:text-gray-300 font-medium">{art.authorName}</td>

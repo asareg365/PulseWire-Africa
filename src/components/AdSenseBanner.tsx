@@ -30,7 +30,7 @@ function getFallbackAd(type: string, category?: string): AIAd {
       description: 'Modern, secure payment APIs designed for startups, small businesses, and enterprise platforms across Nigeria, Ghana, and Kenya.',
       link: 'https://paystack.com',
       ctaText: 'Get Started',
-      imageUrl: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=600&q=80',
+      imageUrl: '/logo-wide.svg',
       themeColor: 'sky'
     };
   } else if (normCategory.includes('sport') || normCategory.includes('football')) {
@@ -40,7 +40,7 @@ function getFallbackAd(type: string, category?: string): AIAd {
       description: 'Step up your speed and agility on the field with Puma premium running gear and custom athletic sportswear.',
       link: 'https://puma.com',
       ctaText: 'Shop Now',
-      imageUrl: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=600&q=80',
+      imageUrl: '/logo-wide.svg',
       themeColor: 'amber'
     };
   } else if (normCategory.includes('lifestyle') || normCategory.includes('entertainment') || normCategory.includes('travel')) {
@@ -50,7 +50,7 @@ function getFallbackAd(type: string, category?: string): AIAd {
       description: 'Experience ultra-premium economy seats, luxury pre-flight lounges, and top-tier hospitality on daily direct flights.',
       link: 'https://virginatlantic.com',
       ctaText: 'Book Flight',
-      imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
+      imageUrl: '/logo-wide.svg',
       themeColor: 'rose'
     };
   }
@@ -62,7 +62,7 @@ function getFallbackAd(type: string, category?: string): AIAd {
     description: 'Grow and secure your wealth with our tailored wealth management and checking accounts across West Africa.',
     link: 'https://sc.com/africa',
     ctaText: 'Learn More',
-    imageUrl: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '/logo-wide.svg',
     themeColor: 'emerald'
   };
 }

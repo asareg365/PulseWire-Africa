@@ -27,6 +27,7 @@
         "content": { "type": "string" },
         "featuredImage": { "type": "string" },
         "category": { "type": "string" },
+        "subCategory": { "type": "string" },
         "tags": { "type": "array" },
         "authorId": { "type": "string" },
         "authorName": { "type": "string" },

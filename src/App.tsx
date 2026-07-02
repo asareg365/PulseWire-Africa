@@ -29,6 +29,7 @@ import ContributorDashboard from './components/ContributorDashboard';
 import ReaderDashboard from './components/ReaderDashboard';
 import InfoPages from './components/InfoPages';
 import AuthorBioCard from './components/AuthorBioCard';
+import SocialShareCard from './components/SocialShareCard';
 import { 
   BookOpen, 
   Calendar, 
@@ -946,6 +947,11 @@ export default function App() {
                                 </span>
                               );
                             })}
+                            {articles[0].subCategory && (
+                              <span className="bg-gray-950/80 text-white text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-lg tracking-wider font-mono">
+                                {articles[0].subCategory}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="space-y-2">
@@ -1052,6 +1058,11 @@ export default function App() {
                                       </span>
                                     );
                                   })}
+                                  {art.subCategory && (
+                                    <span className="bg-emerald-700 text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded tracking-wide font-mono">
+                                      {art.subCategory}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                               <div className="space-y-1.5">
@@ -1173,6 +1184,12 @@ export default function App() {
                           </React.Fragment>
                         );
                       })}
+                      {selectedArticle.subCategory && (
+                        <>
+                          <ChevronRight className="h-3 w-3" />
+                          <span className="text-emerald-700 dark:text-emerald-500 capitalize font-medium">{selectedArticle.subCategory}</span>
+                        </>
+                      )}
                       <ChevronRight className="h-3 w-3" />
                       <span className="truncate max-w-[200px] text-gray-500 dark:text-gray-400">{selectedArticle.title}</span>
                     </div>
@@ -1193,6 +1210,11 @@ export default function App() {
                               </button>
                             );
                           })}
+                          {selectedArticle.subCategory && (
+                            <span className="bg-slate-100 dark:bg-gray-800 text-slate-700 dark:text-gray-300 text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md tracking-wider font-mono border border-slate-200 dark:border-gray-700">
+                              {selectedArticle.subCategory}
+                            </span>
+                          )}
                           {selectedArticle.isSponsored && (
                             <span className="bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400 text-[10px] font-bold uppercase px-2 py-1 rounded-md border border-amber-200 dark:border-amber-900/50 flex items-center gap-1">
                               <Award className="h-3 w-3" />
@@ -1664,6 +1686,14 @@ export default function App() {
                           {copiedLink ? 'Link Copied' : 'Copy Link'}
                         </button>
                       </div>
+                    </div>
+
+                    {/* Highly Optimized Visual Social Share Card Generator */}
+                    <div className="mt-6">
+                      <SocialShareCard 
+                        article={selectedArticle} 
+                        onShareLogged={handleShareArticle} 
+                      />
                     </div>
 
                     {/* Related Articles inline block */}

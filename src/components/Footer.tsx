@@ -102,11 +102,35 @@ export default function Footer({ navigate }: FooterProps) {
             A premier, high-integrity digital news network reporting investigative stories, corporate business, technology breakthroughs, and sports insights.
           </p>
           <div className="flex items-center space-x-3 text-slate-400 dark:text-gray-500">
-            <a href="#" className="hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"><Twitter className="h-4 w-4" /></a>
-            <a href="#" className="hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"><Facebook className="h-4 w-4" /></a>
-            <a href="#" className="hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"><Instagram className="h-4 w-4" /></a>
-            <a href="#" className="hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"><Linkedin className="h-4 w-4" /></a>
-            <a href="#" className="hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"><Globe className="h-4 w-4" /></a>
+            <a 
+              href="https://x.com/pulsewireafric" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              title="PulseWire Africa on X (@pulsewireafric)"
+              className="hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
+            >
+              <Twitter className="h-4 w-4" />
+            </a>
+            <a 
+              href="https://www.facebook.com/profile.php?id=61591470064192" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              title="PulseWire Africa on Facebook"
+              className="hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
+            >
+              <Facebook className="h-4 w-4" />
+            </a>
+            <a 
+              href="https://www.instagram.com/pulsewireafric/" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              title="PulseWire Africa on Instagram (@pulsewireafric)"
+              className="hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
+            >
+              <Instagram className="h-4 w-4" />
+            </a>
+            <a href="#" className="hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors" title="LinkedIn (Coming Soon)"><Linkedin className="h-4 w-4" /></a>
+            <a href="#" className="hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors" title="Website"><Globe className="h-4 w-4" /></a>
           </div>
         </div>
 
@@ -219,9 +243,9 @@ export default function Footer({ navigate }: FooterProps) {
             <span>© 2026 PulseWire Africa all rights reserved</span>
             <span className="hidden md:inline">•</span>
             <div className="flex gap-3">
-              <a href="#" className="hover:text-emerald-700">TWITTER</a>
-              <a href="#" className="hover:text-emerald-700">INSTAGRAM</a>
-              <a href="#" className="hover:text-emerald-700">LINKEDIN</a>
+              <a href="https://x.com/pulsewireafric" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-700 transition-colors">TWITTER</a>
+              <a href="https://www.instagram.com/pulsewireafric/" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-700 transition-colors">INSTAGRAM</a>
+              <a href="https://www.facebook.com/profile.php?id=61591470064192" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-700 transition-colors">FACEBOOK</a>
             </div>
           </div>
         </div>

@@ -68,7 +68,7 @@ Major international record labels are establishing full-time subsidiaries in Lag
 The streaming boom is translating to direct economic benefits. West African music festivals now attract hundreds of thousands of international tourists, especially during the December festive season ("December in GH").
 
 "Afrobeats is more than dance music; it is the ultimate vehicle for African soft power and economic tourism," notes musical director Yaw Ansah. "We are telling our own stories, and the entire globe is dancing to the tempo."`,
-    featuredImage: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1200&q=80",
+    featuredImage: "/logo-wide.svg",
     images: [],
     category: "entertainment",
     tags: ["Afrobeats", "Music", "AccraFestivals", "GlobalStreaming", "Culture"],
@@ -90,7 +90,7 @@ export const SEED_ADS: AdPlacement[] = [
     id: "seed-ad-1",
     title: "Fly African Airways - Connect Directly Accra to London",
     type: "banner",
-    imageUrl: "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1200&q=80",
+    imageUrl: "/logo-wide.svg",
     link: "https://example.com/airline-offer",
     active: true,
     impressions: 240,
@@ -100,7 +100,7 @@ export const SEED_ADS: AdPlacement[] = [
     id: "seed-ad-2",
     title: "Pulse Fintech - Secure Cross-Border Mobile Wallet",
     type: "sidebar",
-    imageUrl: "https://images.unsplash.com/photo-1563013544-824ae1d704d3?auto=format&fit=crop&w=400&q=80",
+    imageUrl: "/favicon.svg",
     link: "https://example.com/fintech",
     active: true,
     impressions: 180,

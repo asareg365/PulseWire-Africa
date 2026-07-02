@@ -161,14 +161,14 @@ export default function InfoPages({ initialPage = 'about', onNavigate }: InfoPag
                   ======================================= */}
               {activeTab === 'about' && (
                 <div id="content-info-about" className="space-y-6">
-                  <div className="relative h-60 md:h-72 w-full rounded-2xl overflow-hidden mb-8 border border-slate-100 dark:border-slate-900 shadow-sm">
+                  <div className="relative h-60 md:h-80 w-full rounded-2xl overflow-hidden mb-8 border border-slate-100 dark:border-slate-900 shadow-sm bg-slate-950">
                     <img 
-                      src="https://images.unsplash.com/photo-1542435503-956c469947f6?auto=format&fit=crop&w=1200&q=80" 
+                      src="/about_header_banner.jpg" 
                       alt="PulseWire Africa Team"
                       referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover" 
+                      className="w-full h-full object-cover opacity-90" 
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent flex items-end p-6">
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/40 to-transparent flex items-end p-6">
                       <div>
                         <span className="text-xs bg-emerald-600 text-white font-bold font-mono px-2 py-0.5 rounded tracking-wide uppercase">
                           Our Manifesto

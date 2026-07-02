@@ -674,6 +674,9 @@ Output must be a valid JSON object matching this schema:
   // --- Dynamic SEO Meta Tags Injection for Article Details ---
   app.get('/article/:slug', async (req, res, next) => {
     const slug = req.params.slug;
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.get('host');
+    const appUrl = `${protocol}://${host}`;
     
     try {
       // In a robust application, we would load the article from Firestore on the server.
@@ -777,11 +780,11 @@ Output must be a valid JSON object matching this schema:
     <!-- PulseWire Africa Dynamic SEO SSR -->
     <title>${articleData.title} | PulseWire Africa</title>
     <meta name="description" content="${articleData.summary.replace(/"/g, '&quot;')}" />
-    <link rel="canonical" href="${process.env.APP_URL || 'https://pulsewireafrica-152570020464.us-central1.run.app'}/article/${slug}" />
+    <link rel="canonical" href="${appUrl}/article/${slug}" />
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="article" />
-    <meta property="og:url" content="${process.env.APP_URL || 'https://pulsewireafrica-152570020464.us-central1.run.app'}/article/${slug}" />
+    <meta property="og:url" content="${appUrl}/article/${slug}" />
     <meta property="og:title" content="${articleData.title.replace(/"/g, '&quot;')}" />
     <meta property="og:description" content="${articleData.summary.replace(/"/g, '&quot;')}" />
     <meta property="og:image" content="${articleData.featuredImage}" />
@@ -815,6 +818,10 @@ Output must be a valid JSON object matching this schema:
 
   // --- Dynamic XML Sitemap ---
   app.get('/sitemap.xml', async (req, res) => {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.get('host');
+    const appUrl = `${protocol}://${host}`;
+    
     try {
       const firestoreUrl = `https://firestore.googleapis.com/v1/projects/pulsewireafrica/databases/ai-studio-pulsewireafrica-ce7cc083-15ac-489c-b8ff-506dc3277285/documents/articles?pageSize=100`;
       const response = await fetch(firestoreUrl);
@@ -835,7 +842,6 @@ Output must be a valid JSON object matching this schema:
         }
       }
 
-      const appUrl = process.env.APP_URL || 'https://pulsewireafrica-152570020464.us-central1.run.app';
       const categories = ['ghana', 'africa', 'world', 'sports', 'football', 'business', 'technology', 'entertainment', 'health', 'lifestyle'];
 
       let xml = `<?xml version="1.0" encoding="UTF-8"?>
