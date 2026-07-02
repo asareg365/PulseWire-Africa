@@ -24,6 +24,7 @@ export interface Article {
   category: string; // e.g. Ghana, Africa, World, Sports, Football, Business, Technology, Entertainment, Health, Lifestyle
   categories?: string[]; // Multiple categories support
   subCategory?: string; // Optional typed-in sub category
+  imageAlt?: string; // Optional alternative text for the main image
   tags: string[];
   authorId: string;
   authorName: string;

@@ -26,6 +26,7 @@
         "summary": { "type": "string" },
         "content": { "type": "string" },
         "featuredImage": { "type": "string" },
+        "imageAlt": { "type": "string" },
         "category": { "type": "string" },
         "subCategory": { "type": "string" },
         "tags": { "type": "array" },

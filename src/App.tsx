@@ -934,7 +934,7 @@ export default function App() {
                         <div className="relative overflow-hidden rounded-2xl aspect-[16/9] border border-gray-200 dark:border-gray-800 shadow-sm">
                           <img 
                             src={articles[0].featuredImage} 
-                            alt={articles[0].title} 
+                            alt={articles[0].imageAlt || articles[0].title} 
                             referrerPolicy="no-referrer"
                             className="w-full h-full object-cover transform group-hover:scale-[1.02] transition-transform duration-700" 
                           />
@@ -1045,7 +1045,7 @@ export default function App() {
                               <div className="relative overflow-hidden rounded-xl aspect-[16/10] border border-gray-200/55 dark:border-gray-800 shadow-sm">
                                 <img 
                                   src={art.featuredImage} 
-                                  alt={art.title} 
+                                  alt={art.imageAlt || art.title} 
                                   referrerPolicy="no-referrer"
                                   className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" 
                                 />
@@ -1126,7 +1126,7 @@ export default function App() {
                                 <div className="relative overflow-hidden rounded-xl aspect-[16/10] border border-gray-200 dark:border-gray-800 shadow-sm">
                                   <img 
                                     src={art.featuredImage} 
-                                    alt={art.title} 
+                                    alt={art.imageAlt || art.title} 
                                     referrerPolicy="no-referrer"
                                     className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" 
                                   />
@@ -1280,7 +1280,7 @@ export default function App() {
                     {/* Featured Image */}
                     <NewsImage 
                       src={selectedArticle.featuredImage} 
-                      alt={selectedArticle.title} 
+                      alt={selectedArticle.imageAlt || selectedArticle.title} 
                       caption={selectedArticle.summary} 
                     />
 

@@ -109,6 +109,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
   const [editorSubCategory, setEditorSubCategory] = useState('');
   const [editorTags, setEditorTags] = useState('');
   const [editorFeaturedImage, setEditorFeaturedImage] = useState('');
+  const [editorImageAlt, setEditorImageAlt] = useState('');
   const [editorImages, setEditorImages] = useState<string[]>([]);
   const [editorStatus, setEditorStatus] = useState<'draft' | 'published' | 'scheduled'>('draft');
   const [editorIsSponsored, setEditorIsSponsored] = useState(false);
@@ -330,6 +331,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
       summary: '',
       content: '',
       featuredImage: '',
+      imageAlt: '',
       images: [],
       category: 'ghana',
       categories: ['ghana'],
@@ -355,6 +357,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
     setEditorSubCategory('');
     setEditorTags('');
     setEditorFeaturedImage('');
+    setEditorImageAlt('');
     setEditorImages([]);
     setEditorStatus('draft');
     setEditorIsSponsored(false);
@@ -376,6 +379,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
     setEditorSubCategory(art.subCategory || '');
     setEditorTags(art.tags.join(', '));
     setEditorFeaturedImage(art.featuredImage);
+    setEditorImageAlt(art.imageAlt || '');
     setEditorImages(art.images || []);
     setEditorStatus(art.status);
     setEditorIsSponsored(art.isSponsored);
@@ -424,6 +428,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
       subCategory: editorSubCategory,
       tags: editorTags.split(',').map(t => t.trim()).filter(Boolean),
       featuredImage: editorFeaturedImage,
+      imageAlt: editorImageAlt,
       images: editorImages,
       status: editorStatus,
       isSponsored: editorIsSponsored,
@@ -1386,6 +1391,18 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                       onChange={e => setEditorFeaturedImage(e.target.value)}
                       className="w-full p-2 rounded bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-xs text-gray-900 dark:text-white mb-3"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Image Alt Text</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. A vibrant sunset over the skyline of Accra, Ghana"
+                      value={editorImageAlt}
+                      onChange={e => setEditorImageAlt(e.target.value)}
+                      className="w-full p-2 rounded bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-xs text-gray-900 dark:text-white"
+                    />
+                    <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">Descriptive alternative text for screen readers and search engines (SEO).</p>
                   </div>
 
                   {/* Drag and Drop Zone */}
