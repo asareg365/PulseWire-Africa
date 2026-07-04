@@ -199,6 +199,13 @@ export function isUsingLocalFallback(): boolean {
   }
 }
 
+export function resetFirestoreFallback() {
+  isFirestoreUnavailable = false;
+  try {
+    sessionStorage.removeItem('pulsewire_use_local_db');
+  } catch (e) {}
+}
+
 // Seeding function
 export async function seedDatabaseIfEmpty(force = false) {
   const pathForArticles = 'articles';

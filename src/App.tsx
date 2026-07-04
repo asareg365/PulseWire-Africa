@@ -15,7 +15,8 @@ import {
   getAuthorById,
   publishDueScheduledArticles,
   isUsingLocalFallback,
-  getLastArticlesFetchTime
+  getLastArticlesFetchTime,
+  resetFirestoreFallback
 } from './lib/db';
 import { auth } from './lib/firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
@@ -62,7 +63,9 @@ import {
   SkipBack,
   SkipForward,
   Mail,
-  X
+  X,
+  RefreshCw,
+  Database
 } from 'lucide-react';
 
 export function getAuthorAvatar(authorName: string): string {
@@ -664,6 +667,7 @@ export default function App() {
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
+    resetFirestoreFallback();
     try {
       await loadPrimaryContent(true);
       // Also update current category articles if we are on a category page
@@ -678,8 +682,35 @@ export default function App() {
           setSelectedArticle(found);
         }
       }
+      setUsingFallback(isUsingLocalFallback());
     } catch (e) {
       console.error("Error manually refreshing content:", e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleReconnect = async () => {
+    setIsRefreshing(true);
+    resetFirestoreFallback();
+    setUsingFallback(false);
+    try {
+      await loadPrimaryContent(true);
+      if (currentPath.startsWith('/category/')) {
+        const catId = currentPath.split('/category/')[1];
+        const items = await getArticlesByCategory(catId, true);
+        setCategoryArticles(items);
+      } else if (currentPath.startsWith('/article/')) {
+        const slug = currentPath.split('/article/')[1];
+        const found = await getArticleBySlug(slug, true);
+        if (found) {
+          setSelectedArticle(found);
+        }
+      }
+      const stillFallback = isUsingLocalFallback();
+      setUsingFallback(stillFallback);
+    } catch (e) {
+      console.error("Failed to reconnect to Firestore:", e);
     } finally {
       setIsRefreshing(false);
     }
@@ -869,12 +900,24 @@ export default function App() {
               <strong>Running in Local-only Demo Mode:</strong> The Firestore database daily free-tier read/write limit is currently exceeded. PulseWire Africa has automatically enabled <strong>Local Offline Fallback (localStorage)</strong> to keep all articles, comments, newsletters, and dashboards fully responsive and functional!
             </span>
           </div>
-          <button 
-            onClick={() => setUsingFallback(false)}
-            className="bg-black/20 hover:bg-black/30 text-white font-bold uppercase tracking-wider px-2.5 py-1 rounded text-[10px] shrink-0 transition-colors"
-          >
-            Dismiss
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button 
+              onClick={handleReconnect}
+              disabled={isRefreshing}
+              className="bg-white text-amber-900 hover:bg-white/95 disabled:opacity-50 font-bold uppercase tracking-wider px-3 py-1 rounded text-[10px] shrink-0 transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+              id="btn-reconnect-live-db"
+            >
+              <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Reconnect Live DB
+            </button>
+            <button 
+              onClick={() => setUsingFallback(false)}
+              className="bg-black/20 hover:bg-black/30 text-white font-bold uppercase tracking-wider px-2.5 py-1 rounded text-[10px] shrink-0 transition-colors cursor-pointer"
+              id="btn-dismiss-fallback-banner"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
 
