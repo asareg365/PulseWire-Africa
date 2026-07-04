@@ -23,9 +23,9 @@ export default function NewsImage({
   const [imageLoaded, setImageLoaded] = useState(false);
 
   // Get optimized URLs for different contexts
-  const blurSrc = getOptimizedImageUrl(src, { width: 80, quality: 30, fit: 'crop' });
-  const displaySrc = getOptimizedImageUrl(src, { width: 1200, quality: 85 });
-  const zoomSrc = getOptimizedImageUrl(src, { width: 2000, quality: 90 });
+  const blurSrc = getOptimizedImageUrl(src, { width: 80, quality: 30, fit: 'crop' }) || null;
+  const displaySrc = getOptimizedImageUrl(src, { width: 1200, quality: 85 }) || null;
+  const zoomSrc = getOptimizedImageUrl(src, { width: 2000, quality: 90 }) || null;
 
   return (
     <div className={`space-y-2 ${className}`} id={`news-image-container-${Math.random().toString(36).substr(2, 9)}`}>
@@ -34,23 +34,27 @@ export default function NewsImage({
         className={`relative overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-slate-100 dark:bg-slate-950 group/img shadow-sm ${aspectRatioClass}`}
       >
         {/* 1. Low-res blurred ambient backdrop to fill empty space for non-16:9 ratios */}
-        <img
-          src={blurSrc}
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover filter blur-2xl scale-110 opacity-40 dark:opacity-20 pointer-events-none select-none z-0"
-        />
+        {blurSrc && (
+          <img
+            src={blurSrc}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover filter blur-2xl scale-110 opacity-40 dark:opacity-20 pointer-events-none select-none z-0"
+          />
+        )}
 
         {/* 2. Main High-resolution Image - Centered and set to contain so it never crops */}
-        <img
-          src={displaySrc}
-          alt={alt}
-          referrerPolicy="no-referrer"
-          onLoad={() => setImageLoaded(true)}
-          className={`relative w-full h-full object-contain z-10 transition-all duration-500 ${
-            imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-          }`}
-        />
+        {displaySrc && (
+          <img
+            src={displaySrc}
+            alt={alt}
+            referrerPolicy="no-referrer"
+            onLoad={() => setImageLoaded(true)}
+            className={`relative w-full h-full object-contain z-10 transition-all duration-500 ${
+              imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+            }`}
+          />
+        )}
 
         {/* 3. Smooth Shimmer skeleton before image loads */}
         {!imageLoaded && (
@@ -100,12 +104,14 @@ export default function NewsImage({
             className="relative max-w-5xl max-h-[80vh] w-full h-full flex items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <img
-              src={zoomSrc}
-              alt={alt}
-              referrerPolicy="no-referrer"
-              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl border border-white/10"
-            />
+            {zoomSrc && (
+              <img
+                src={zoomSrc}
+                alt={alt}
+                referrerPolicy="no-referrer"
+                className="max-w-full max-h-full object-contain rounded-xl shadow-2xl border border-white/10"
+              />
+            )}
           </div>
 
           {/* Bottom Caption Bar */}
@@ -147,19 +153,21 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
       {/* Grid of extra images */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {images.map((imgUrl, idx) => {
-          const thumbnail = getOptimizedImageUrl(imgUrl, { width: 500, quality: 80, fit: 'crop' });
+          const thumbnail = getOptimizedImageUrl(imgUrl, { width: 500, quality: 80, fit: 'crop' }) || null;
           return (
             <div 
               key={idx}
               onClick={() => setActiveIdx(idx)}
               className="relative aspect-[4/3] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-slate-50 dark:bg-slate-950 cursor-pointer group/gal shadow-sm hover:shadow-md transition-all duration-300"
             >
-              <img 
-                src={thumbnail} 
-                alt={`${title} - Gallery image ${idx + 1}`} 
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover transform group-hover/gal:scale-105 transition-transform duration-500"
-              />
+              {thumbnail && (
+                <img 
+                  src={thumbnail} 
+                  alt={`${title} - Gallery image ${idx + 1}`} 
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover transform group-hover/gal:scale-105 transition-transform duration-500"
+                />
+              )}
               <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/gal:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="px-3 py-1.5 bg-slate-900/90 text-white text-[10px] font-bold font-mono uppercase tracking-widest rounded-lg flex items-center gap-1.5">
                   <Maximize2 className="h-3 w-3" /> View Photo
@@ -200,12 +208,14 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
               </button>
             )}
 
-            <img
-              src={getOptimizedImageUrl(images[activeIdx], { width: 1800, quality: 90 })}
-              alt={`${title} - Large view`}
-              referrerPolicy="no-referrer"
-              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl border border-white/5"
-            />
+            {images[activeIdx] && (
+              <img
+                src={getOptimizedImageUrl(images[activeIdx], { width: 1800, quality: 90 }) || null}
+                alt={`${title} - Large view`}
+                referrerPolicy="no-referrer"
+                className="max-w-full max-h-full object-contain rounded-xl shadow-2xl border border-white/5"
+              />
+            )}
 
             {images.length > 1 && (
               <button 

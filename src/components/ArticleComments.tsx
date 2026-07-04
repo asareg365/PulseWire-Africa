@@ -223,7 +223,7 @@ export default function ArticleComments({ articleId, navigate }: ArticleComments
             <div key={comm.id} className="p-4 border border-gray-100 dark:border-gray-900/50 hover:border-gray-200 dark:hover:border-gray-800 bg-white dark:bg-gray-950/20 rounded-xl transition-all shadow-xs">
               <div className="flex gap-4">
                 <img 
-                  src={comm.authorAvatar} 
+                  src={comm.authorAvatar || null} 
                   alt={comm.authorName} 
                   referrerPolicy="no-referrer"
                   className="w-10 h-10 rounded-full object-cover shrink-0 border border-gray-200 dark:border-gray-800" 
@@ -314,7 +314,7 @@ export default function ArticleComments({ articleId, navigate }: ArticleComments
                   {getSortedReplies(comm.id).map((reply) => (
                     <div key={reply.id} className="flex gap-3 py-2 border-t border-gray-50/50 dark:border-gray-900/30 first:border-t-0">
                       <img 
-                        src={reply.authorAvatar} 
+                        src={reply.authorAvatar || null} 
                         alt={reply.authorName} 
                         referrerPolicy="no-referrer"
                         className="w-8 h-8 rounded-full object-cover shrink-0 border border-gray-200 dark:border-gray-800" 

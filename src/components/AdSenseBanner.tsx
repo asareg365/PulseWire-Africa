@@ -267,7 +267,7 @@ export default function AdSenseBanner({ type, contextTitle, contextCategory, con
             id="sticky-ad-link"
           >
             <img 
-              src={currentAd.imageUrl} 
+              src={currentAd.imageUrl || null} 
               alt={currentAd.title} 
               referrerPolicy="no-referrer"
               className="w-12 h-12 object-cover rounded-lg border border-slate-800 shrink-0 animate-fade-in" 
@@ -382,7 +382,7 @@ export default function AdSenseBanner({ type, contextTitle, contextCategory, con
             >
               <div className="relative overflow-hidden aspect-[4/3] bg-gray-100 dark:bg-gray-900">
                 <img 
-                  src={currentAd.imageUrl} 
+                  src={currentAd.imageUrl || null} 
                   alt={currentAd.title} 
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" 
@@ -421,7 +421,7 @@ export default function AdSenseBanner({ type, contextTitle, contextCategory, con
               className="group block overflow-hidden rounded-xl md:col-span-5 relative shadow-sm aspect-[16/10] md:aspect-auto h-full max-h-40 min-h-[110px]"
             >
               <img 
-                src={currentAd.imageUrl} 
+                src={currentAd.imageUrl || null} 
                 alt={currentAd.title} 
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500 absolute inset-0" 

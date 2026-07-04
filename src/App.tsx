@@ -75,7 +75,10 @@ export function getAuthorAvatar(authorName: string): string {
 
 export default function App() {
   // Database fallback status
-  const [usingFallback, setUsingFallback] = useState(false);
+  const [usingFallback, setUsingFallback] = useState(() => {
+    resetFirestoreFallback();
+    return false;
+  });
 
   // Navigation & Routing state
   const [currentPath, setCurrentPath] = useState('/');
@@ -506,9 +509,7 @@ export default function App() {
   // Poll fallback status
   useEffect(() => {
     const checkFallback = () => {
-      if (isUsingLocalFallback()) {
-        setUsingFallback(true);
-      }
+      setUsingFallback(isUsingLocalFallback());
     };
     checkFallback();
     const interval = setInterval(checkFallback, 2000);
@@ -682,6 +683,15 @@ export default function App() {
           setSelectedArticle(found);
         }
       }
+      
+      if (auth.currentUser) {
+        const author = await getAuthorById(auth.currentUser.uid);
+        if (author) {
+          setCurrentUserAuthor(author);
+          setSavedSlugs(author.savedSlugs || []);
+        }
+      }
+
       setUsingFallback(isUsingLocalFallback());
     } catch (e) {
       console.error("Error manually refreshing content:", e);
@@ -707,6 +717,15 @@ export default function App() {
           setSelectedArticle(found);
         }
       }
+
+      if (auth.currentUser) {
+        const author = await getAuthorById(auth.currentUser.uid);
+        if (author) {
+          setCurrentUserAuthor(author);
+          setSavedSlugs(author.savedSlugs || []);
+        }
+      }
+
       const stillFallback = isUsingLocalFallback();
       setUsingFallback(stillFallback);
     } catch (e) {
@@ -1043,7 +1062,7 @@ export default function App() {
                       <div className="lg:col-span-2 space-y-4 cursor-pointer group" onClick={() => navigate(`/article/${articles[0].slug}`)}>
                         <div className="relative overflow-hidden rounded-2xl aspect-[16/9] border border-gray-200 dark:border-gray-800 shadow-sm">
                           <img 
-                            src={articles[0].featuredImage} 
+                            src={articles[0].featuredImage || null} 
                             alt={articles[0].imageAlt || articles[0].title} 
                             referrerPolicy="no-referrer"
                             className="w-full h-full object-cover transform group-hover:scale-[1.02] transition-transform duration-700" 
@@ -1154,7 +1173,7 @@ export default function App() {
                             <div className="space-y-3">
                               <div className="relative overflow-hidden rounded-xl aspect-[16/10] border border-gray-200/55 dark:border-gray-800 shadow-sm">
                                 <img 
-                                  src={art.featuredImage} 
+                                  src={art.featuredImage || null} 
                                   alt={art.imageAlt || art.title} 
                                   referrerPolicy="no-referrer"
                                   className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" 
@@ -1235,7 +1254,7 @@ export default function App() {
                               <div className="space-y-3">
                                 <div className="relative overflow-hidden rounded-xl aspect-[16/10] border border-gray-200 dark:border-gray-800 shadow-sm">
                                   <img 
-                                    src={art.featuredImage} 
+                                    src={art.featuredImage || null} 
                                     alt={art.imageAlt || art.title} 
                                     referrerPolicy="no-referrer"
                                     className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" 
@@ -1822,7 +1841,7 @@ export default function App() {
                               className="group cursor-pointer space-y-2.5"
                             >
                               <div className="relative overflow-hidden rounded-xl aspect-[16/10] border border-gray-200 dark:border-gray-800 shadow-sm">
-                                <img src={rel.featuredImage} alt={rel.title} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" />
+                                <img src={rel.featuredImage || null} alt={rel.title} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" />
                               </div>
                               <h4 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-emerald-700 transition-colors leading-snug line-clamp-2">
                                 {rel.title}
@@ -1877,7 +1896,7 @@ export default function App() {
                         >
                           <div className="space-y-3">
                             <div className="relative overflow-hidden rounded-xl aspect-[16/10] border border-gray-200 dark:border-gray-800 shadow-sm">
-                              <img src={art.featuredImage} alt={art.title} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" />
+                              <img src={art.featuredImage || null} alt={art.title} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" />
                             </div>
                             <h4 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-emerald-700 transition-colors leading-snug line-clamp-2">
                               {art.title}
@@ -1919,7 +1938,7 @@ export default function App() {
                         >
                           <div className="space-y-3">
                             <div className="relative overflow-hidden rounded-xl aspect-[16/10] border border-gray-200 dark:border-gray-800 shadow-sm">
-                              <img src={art.featuredImage} alt={art.title} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" />
+                              <img src={art.featuredImage || null} alt={art.title} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" />
                               <div className="absolute top-3 left-3 flex flex-wrap gap-1 z-10">
                                 {(art.categories && art.categories.length > 0 ? art.categories : [art.category]).map(catId => {
                                   const cat = CATEGORIES.find(c => c.id === catId);

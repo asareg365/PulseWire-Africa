@@ -1460,10 +1460,10 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                     }}
                     className="border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-emerald-500 rounded-lg p-5 text-center cursor-pointer transition-all bg-white dark:bg-gray-900 relative overflow-hidden group min-h-[100px] flex flex-col justify-center items-center"
                   >
-                    {editorFeaturedImage ? (
+                    {editorFeaturedImage && editorFeaturedImage !== "" ? (
                       <>
                         <img 
-                          src={editorFeaturedImage} 
+                          src={editorFeaturedImage || null} 
                           alt="Cover Preview" 
                           className="absolute inset-0 w-full h-full object-cover opacity-20 dark:opacity-40 group-hover:opacity-10 transition-opacity" 
                           referrerPolicy="no-referrer"
@@ -1542,7 +1542,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                             key={uIdx}
                             className="relative overflow-hidden rounded border border-gray-200 dark:border-gray-800 transition-all bg-white dark:bg-gray-900 group/item h-16"
                           >
-                            <img src={url} alt="Lookup option" className="w-full h-full object-cover" />
+                            <img src={url || null} alt="Lookup option" className="w-full h-full object-cover" />
                             <div className="absolute inset-0 bg-black/80 opacity-0 group-hover/item:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1 z-20">
                               <button
                                 type="button"
@@ -1661,7 +1661,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {editorImages.map((imgUrl, idx) => (
                           <div key={idx} className="relative aspect-[4/3] rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 overflow-hidden group/attached">
-                            <img src={imgUrl} alt="Attached thumbnail" className="w-full h-full object-cover" />
+                            <img src={imgUrl || null} alt="Attached thumbnail" className="w-full h-full object-cover" />
                             
                             {/* Re-order & Delete Controls overlay */}
                             <div className="absolute inset-0 bg-slate-950/85 opacity-0 group-hover/attached:opacity-100 transition-opacity flex flex-col items-center justify-between p-2">
@@ -1866,10 +1866,10 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                   }}
                   className="border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-emerald-500 rounded-lg p-3 text-center cursor-pointer transition-all bg-gray-50 dark:bg-gray-950 relative overflow-hidden group min-h-[80px] flex flex-col justify-center items-center"
                 >
-                  {adImageUrl ? (
+                  {adImageUrl && adImageUrl !== "" ? (
                     <>
                       <img 
-                        src={adImageUrl} 
+                        src={adImageUrl || null} 
                         alt="Ad Preview" 
                         className="absolute inset-0 w-full h-full object-cover opacity-20 dark:opacity-40 group-hover:opacity-10 transition-opacity" 
                         referrerPolicy="no-referrer"
@@ -2079,10 +2079,10 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                   }}
                   className="border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-emerald-500 rounded-lg p-3 text-center cursor-pointer transition-all bg-gray-50 dark:bg-gray-950 relative overflow-hidden group min-h-[80px] flex flex-col justify-center items-center"
                 >
-                  {authorAvatarInput ? (
+                  {authorAvatarInput && authorAvatarInput !== "" ? (
                     <>
                       <img 
-                        src={authorAvatarInput} 
+                        src={authorAvatarInput || null} 
                         alt="Profile Preview" 
                         className="absolute inset-0 w-full h-full object-cover opacity-20 dark:opacity-45 group-hover:opacity-10 transition-opacity" 
                         referrerPolicy="no-referrer"
@@ -2333,7 +2333,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                       articles.map(art => (
                         <tr key={art.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/10 transition-colors">
                           <td className="p-4 flex items-center gap-3">
-                            <img src={art.featuredImage} alt="Cover" className="w-10 h-10 object-cover rounded border border-gray-200 dark:border-gray-800 shrink-0" />
+                            <img src={art.featuredImage || null} alt="Cover" className="w-10 h-10 object-cover rounded border border-gray-200 dark:border-gray-800 shrink-0" />
                             <div className="min-w-0">
                               <h4 className="font-semibold text-gray-900 dark:text-white truncate max-w-xs md:max-w-md font-sans">{art.title}</h4>
                               <p className="text-[11px] text-gray-400 font-mono truncate max-w-xs">/{art.slug}</p>
@@ -2438,7 +2438,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                       <div>
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex items-center gap-3">
-                            <img src={ad.imageUrl} alt={ad.title} className="w-12 h-12 object-cover rounded border border-gray-200 dark:border-gray-800 shrink-0" />
+                            <img src={ad.imageUrl || null} alt={ad.title} className="w-12 h-12 object-cover rounded border border-gray-200 dark:border-gray-800 shrink-0" />
                             <div>
                               <h4 className="font-bold text-gray-900 dark:text-white font-sans">{ad.title}</h4>
                               <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 px-2 py-0.5 rounded font-mono font-bold uppercase tracking-wider">{ad.type}</span>
@@ -2501,7 +2501,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                   comments.map(comm => (
                     <div key={comm.id} className="p-5 flex flex-col md:flex-row md:items-start justify-between gap-4 hover:bg-gray-50/20 dark:hover:bg-gray-900/5 transition-colors">
                       <div className="flex gap-3 min-w-0">
-                        <img src={comm.authorAvatar} alt="Avatar" className="w-10 h-10 rounded-full object-cover shrink-0 border border-gray-200 dark:border-gray-800" />
+                        <img src={comm.authorAvatar || null} alt="Avatar" className="w-10 h-10 rounded-full object-cover shrink-0 border border-gray-200 dark:border-gray-800" />
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-bold text-sm text-gray-900 dark:text-white truncate max-w-[200px]">{comm.authorName}</span>
@@ -2715,7 +2715,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                       <div>
                         <div className="flex items-start gap-4">
                           <img 
-                            src={author.avatar} 
+                            src={author.avatar || null} 
                             alt={author.name} 
                             className="w-14 h-14 rounded-full object-cover border border-gray-200 dark:border-gray-800 shrink-0"
                             referrerPolicy="no-referrer"

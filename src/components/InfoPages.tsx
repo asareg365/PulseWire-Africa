@@ -270,9 +270,9 @@ export default function InfoPages({ initialPage = 'about', onNavigate }: InfoPag
                         return displayAuthors.map((author) => (
                           <div key={author.id} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-slate-100 dark:border-slate-900 rounded-xl bg-white dark:bg-slate-950/40">
                             <div className="w-12 h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center font-bold text-slate-800 dark:text-white border border-slate-200 dark:border-slate-800 text-lg overflow-hidden shrink-0">
-                              {author.avatar ? (
+                              {author.avatar && author.avatar !== "" ? (
                                 <img 
-                                  src={author.avatar} 
+                                  src={author.avatar || null} 
                                   alt={author.name} 
                                   className="w-full h-full object-cover"
                                   referrerPolicy="no-referrer"

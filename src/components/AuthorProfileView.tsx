@@ -94,7 +94,7 @@ export default function AuthorProfileView({ authorName, navigate }: AuthorProfil
           {/* Avatar with status/award icon */}
           <div className="relative shrink-0">
             <img
-              src={profile.avatar}
+              src={profile.avatar || null}
               alt={profile.name}
               className="w-24 h-24 md:w-28 md:h-28 rounded-full object-cover border-4 border-white dark:border-slate-900 shadow-md"
               referrerPolicy="no-referrer"
@@ -212,7 +212,7 @@ export default function AuthorProfileView({ authorName, navigate }: AuthorProfil
                 {/* Featured Image */}
                 <div className="relative aspect-[16/10] overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-slate-200/60 dark:border-slate-800/60">
                   <img
-                    src={art.featuredImage}
+                    src={art.featuredImage || null}
                     alt={art.imageAlt || art.title}
                     className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
                     referrerPolicy="no-referrer"

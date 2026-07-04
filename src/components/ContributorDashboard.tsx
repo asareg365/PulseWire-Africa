@@ -242,7 +242,7 @@ export default function ContributorDashboard({ navigate, currentUser }: Contribu
       >
         <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
           <img 
-            src={currentUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name)}&background=059669&color=fff&bold=true`} 
+            src={(currentUser.avatar && currentUser.avatar !== "") ? currentUser.avatar : `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name || 'Contributor')}&background=059669&color=fff&bold=true`} 
             alt={currentUser.name} 
             className="w-16 h-16 rounded-full object-cover border-2 border-emerald-500/20 shadow-md shrink-0"
             referrerPolicy="no-referrer"
@@ -783,7 +783,7 @@ export default function ContributorDashboard({ navigate, currentUser }: Contribu
                   className="flex gap-4 p-5 bg-white dark:bg-slate-900/10 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl relative shadow-xs"
                 >
                   <img
-                    src={comm.authorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(comm.authorName)}&background=f1f5f9&color=dc2626&bold=true`}
+                    src={(comm.authorAvatar && comm.authorAvatar !== "") ? comm.authorAvatar : `https://ui-avatars.com/api/?name=${encodeURIComponent(comm.authorName || 'Anonymous')}&background=f1f5f9&color=dc2626&bold=true`}
                     alt={comm.authorName}
                     className="w-10 h-10 rounded-full object-cover shrink-0 border border-slate-100 dark:border-slate-800"
                     referrerPolicy="no-referrer"

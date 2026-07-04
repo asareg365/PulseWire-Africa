@@ -625,7 +625,7 @@ export default function SocialShareCard({ article, onShareLogged }: SocialShareC
               <>
                 <div className="h-1/2 w-full relative overflow-hidden bg-slate-100 dark:bg-slate-900">
                   <img 
-                    src={article.featuredImage} 
+                    src={article.featuredImage || null} 
                     alt="Cover" 
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
@@ -690,7 +690,7 @@ export default function SocialShareCard({ article, onShareLogged }: SocialShareC
                 {/* Centered Image Frame */}
                 <div className="my-3 w-full h-[140px] rounded-lg overflow-hidden relative shadow-md border border-slate-200/10">
                   <img 
-                    src={article.featuredImage} 
+                    src={article.featuredImage || null} 
                     alt="Cover" 
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"

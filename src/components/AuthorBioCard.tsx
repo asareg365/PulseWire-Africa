@@ -139,7 +139,7 @@ export default function AuthorBioCard({ authorName, onSearchAuthor, onNavigateAu
               title={`View ${profile.name}'s Profile`}
             >
               <img 
-                src={profile.avatar} 
+                src={profile.avatar || null} 
                 alt={profile.name} 
                 className="w-12 h-12 rounded-full object-cover border-2 border-white dark:border-gray-800 shadow-sm shrink-0"
                 referrerPolicy="no-referrer"
