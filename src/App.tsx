@@ -12,7 +12,10 @@ import {
   getActiveAds,
   subscribeNewsletter,
   saveAuthor,
-  getAuthorById
+  getAuthorById,
+  publishDueScheduledArticles,
+  isUsingLocalFallback,
+  getLastArticlesFetchTime
 } from './lib/db';
 import { auth } from './lib/firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
@@ -29,6 +32,7 @@ import ContributorDashboard from './components/ContributorDashboard';
 import ReaderDashboard from './components/ReaderDashboard';
 import InfoPages from './components/InfoPages';
 import AuthorBioCard from './components/AuthorBioCard';
+import AuthorProfileView from './components/AuthorProfileView';
 import SocialShareCard from './components/SocialShareCard';
 import { 
   BookOpen, 
@@ -67,6 +71,9 @@ export function getAuthorAvatar(authorName: string): string {
 }
 
 export default function App() {
+  // Database fallback status
+  const [usingFallback, setUsingFallback] = useState(false);
+
   // Navigation & Routing state
   const [currentPath, setCurrentPath] = useState('/');
   const [searchQuery, setSearchQuery] = useState('');
@@ -190,6 +197,8 @@ export default function App() {
   const [categoryArticles, setCategoryArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [dbReady, setDbReady] = useState(false);
+  const [lastFetchTime, setLastFetchTime] = useState<number>(getLastArticlesFetchTime());
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Saved articles state
   const [savedSlugs, setSavedSlugs] = useState<string[]>([]);
@@ -491,6 +500,18 @@ export default function App() {
     initDB();
   }, []);
 
+  // Poll fallback status
+  useEffect(() => {
+    const checkFallback = () => {
+      if (isUsingLocalFallback()) {
+        setUsingFallback(true);
+      }
+    };
+    checkFallback();
+    const interval = setInterval(checkFallback, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Theme Syncing
   useEffect(() => {
     if (darkMode) {
@@ -627,15 +648,40 @@ export default function App() {
     setLoading(false);
   };
 
-  const loadPrimaryContent = async () => {
+  const loadPrimaryContent = async (forceRefresh = false) => {
     try {
-      const items = await getAllArticles();
+      await publishDueScheduledArticles();
+      const items = await getAllArticles(false, forceRefresh);
       setArticles(items);
       // Popular posts based on views
       const popular = [...items].sort((a, b) => (b.views || 0) - (a.views || 0));
       setPopularArticles(popular);
+      setLastFetchTime(getLastArticlesFetchTime());
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadPrimaryContent(true);
+      // Also update current category articles if we are on a category page
+      if (currentPath.startsWith('/category/')) {
+        const catId = currentPath.split('/category/')[1];
+        const items = await getArticlesByCategory(catId, true);
+        setCategoryArticles(items);
+      } else if (currentPath.startsWith('/article/')) {
+        const slug = currentPath.split('/article/')[1];
+        const found = await getArticleBySlug(slug, true);
+        if (found) {
+          setSelectedArticle(found);
+        }
+      }
+    } catch (e) {
+      console.error("Error manually refreshing content:", e);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -789,6 +835,9 @@ export default function App() {
         isAdmin={isAdmin}
         setIsAdmin={setIsAdmin}
         onSearch={handleSearchTrigger}
+        onRefresh={handleManualRefresh}
+        refreshing={isRefreshing}
+        lastFetchTime={lastFetchTime}
       />
       
       <BreakingTicker navigate={navigate} />
@@ -805,6 +854,24 @@ export default function App() {
           <button 
             onClick={() => setAiConfigured(true)}
             className="bg-white/20 hover:bg-white/30 text-white font-bold uppercase tracking-wider px-2.5 py-1 rounded text-[10px] shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Firestore fallback reminder banner */}
+      {usingFallback && (
+        <div className="bg-amber-600 text-white text-xs py-2.5 px-4 font-sans font-medium flex items-center justify-between shadow-md">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0 animate-pulse text-white" />
+            <span>
+              <strong>Running in Local-only Demo Mode:</strong> The Firestore database daily free-tier read/write limit is currently exceeded. PulseWire Africa has automatically enabled <strong>Local Offline Fallback (localStorage)</strong> to keep all articles, comments, newsletters, and dashboards fully responsive and functional!
+            </span>
+          </div>
+          <button 
+            onClick={() => setUsingFallback(false)}
+            className="bg-black/20 hover:bg-black/30 text-white font-bold uppercase tracking-wider px-2.5 py-1 rounded text-[10px] shrink-0 transition-colors"
           >
             Dismiss
           </button>
@@ -1550,6 +1617,7 @@ export default function App() {
                     <AuthorBioCard 
                       authorName={selectedArticle.authorName} 
                       onSearchAuthor={(name) => navigate(`/search?q=${encodeURIComponent(name)}`)} 
+                      onNavigateAuthor={(name) => navigate(`/author/${encodeURIComponent(name)}`)}
                     />
 
                     {/* Tags and Likes */}
@@ -1994,7 +2062,7 @@ export default function App() {
                     role={currentUserAuthor?.role || 'admin'}
                   />
                 ) : (currentUserAuthor.role === 'editor' || currentUserAuthor.role === 'contributor') ? (
-                  <ContributorDashboard navigate={navigate} />
+                  <ContributorDashboard navigate={navigate} currentUser={currentUserAuthor} />
                 ) : (
                   <ReaderDashboard 
                     navigate={navigate} 
@@ -2007,6 +2075,14 @@ export default function App() {
               {/* --- ROUTE 6: CORPORATE & LEGAL INFO PAGES --- */}
               {currentPath.startsWith('/info/') && (
                 <InfoPages initialPage={infoTab} onNavigate={navigate} />
+              )}
+
+              {/* --- ROUTE 7: DEDICATED AUTHOR PROFILE VIEW --- */}
+              {currentPath.startsWith('/author/') && (
+                <AuthorProfileView 
+                  authorName={decodeURIComponent(currentPath.split('/author/')[1])} 
+                  navigate={navigate} 
+                />
               )}
 
             </motion.div>

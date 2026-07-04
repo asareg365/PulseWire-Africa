@@ -11,7 +11,8 @@ import {
   where, 
   orderBy, 
   limit, 
-  increment 
+  increment,
+  collectionGroup
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { Article, Comment, AdPlacement, NewsletterSubscription, ContactMessage, Author } from '../types';
@@ -66,9 +67,155 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
+// ---------------- Local Storage Fallback DB Manager ----------------
+class LocalDbFallback {
+  private static get<T>(key: string, defaultValue: T): T {
+    try {
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  }
+
+  private static set(key: string, value: any): void {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (err) {
+      console.error('Failed to write to localStorage fallback:', err);
+    }
+  }
+
+  static getArticles(): Article[] {
+    return this.get<Article[]>('pulsewire_fallback_articles', SEED_ARTICLES);
+  }
+
+  static saveArticles(articles: Article[]) {
+    this.set('pulsewire_fallback_articles', articles);
+  }
+
+  static getComments(): Comment[] {
+    const defaultComments = [
+      {
+        id: "comment-1",
+        articleId: "seed-art-1",
+        authorId: "guest",
+        authorName: "Kwadwo Mensah",
+        authorAvatar: "https://ui-avatars.com/api/?name=Kwadwo+Mensah&background=f1f5f9&color=dc2626&bold=true&size=128",
+        content: "This is brilliant! Excellent initiative by the ministry. We need more centers in Takoradi and Tamale too.",
+        createdAt: "2026-06-21T12:00:00Z",
+        approved: true
+      },
+      {
+        id: "comment-2",
+        articleId: "seed-art-1",
+        authorId: "guest",
+        authorName: "Abena Boateng",
+        authorAvatar: "https://ui-avatars.com/api/?name=Abena+Boateng&background=fdf2f8&color=db2777&bold=true&size=128",
+        content: "As a young female developer, this is highly motivating. I will register at the Kumasi hub next week!",
+        createdAt: "2026-06-21T14:30:00Z",
+        approved: true
+      },
+      {
+        id: "comment-3",
+        articleId: "seed-art-2",
+        authorId: "guest",
+        authorName: "Chinedu Okafor",
+        authorAvatar: "https://ui-avatars.com/api/?name=Chinedu+Okafor&background=f0fdf4&color=16a34a&bold=true&size=128",
+        content: "PAPSS is a game changer. Doing transactions between Nigeria and Ghana has been historically ridiculous. Huge win!",
+        createdAt: "2026-06-22T10:15:00Z",
+        approved: true
+      }
+    ];
+    return this.get<Comment[]>('pulsewire_fallback_comments', defaultComments);
+  }
+
+  static saveComments(comments: Comment[]) {
+    this.set('pulsewire_fallback_comments', comments);
+  }
+
+  static getAds(): AdPlacement[] {
+    return this.get<AdPlacement[]>('pulsewire_fallback_ads', SEED_ADS);
+  }
+
+  static saveAds(ads: AdPlacement[]) {
+    this.set('pulsewire_fallback_ads', ads);
+  }
+
+  static getNewsletter(): NewsletterSubscription[] {
+    return this.get<NewsletterSubscription[]>('pulsewire_fallback_newsletter', []);
+  }
+
+  static saveNewsletter(subs: NewsletterSubscription[]) {
+    this.set('pulsewire_fallback_newsletter', subs);
+  }
+
+  static getContacts(): ContactMessage[] {
+    return this.get<ContactMessage[]>('pulsewire_fallback_contacts', []);
+  }
+
+  static saveContacts(msgs: ContactMessage[]) {
+    this.set('pulsewire_fallback_contacts', msgs);
+  }
+
+  static getAuthors(): Author[] {
+    return this.get<Author[]>('pulsewire_fallback_authors', SEED_AUTHORS);
+  }
+
+  static saveAuthors(authors: Author[]) {
+    this.set('pulsewire_fallback_authors', authors);
+  }
+}
+
+let isFirestoreUnavailable = false;
+
+// Determine if we should bypass Firestore and run purely locally
+function shouldBypassFirestore(): boolean {
+  if (isFirestoreUnavailable) return true;
+  try {
+    if (sessionStorage.getItem('pulsewire_use_local_db') === 'true') {
+      isFirestoreUnavailable = true;
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+// Mark Firestore as unavailable and activate fallback mode
+function flagFirestoreUnavailable(error: any) {
+  console.warn("PulseWire Africa is switching to Local Offline Fallback Mode. Error detail:", error);
+  isFirestoreUnavailable = true;
+  try {
+    sessionStorage.setItem('pulsewire_use_local_db', 'true');
+  } catch (e) {}
+}
+
+export function isUsingLocalFallback(): boolean {
+  if (isFirestoreUnavailable) return true;
+  try {
+    return sessionStorage.getItem('pulsewire_use_local_db') === 'true';
+  } catch (e) {
+    return false;
+  }
+}
+
 // Seeding function
 export async function seedDatabaseIfEmpty(force = false) {
   const pathForArticles = 'articles';
+  
+  // Seed local fallback database if empty
+  const localArticles = LocalDbFallback.getArticles();
+  if (localArticles.length === 0 || force) {
+    LocalDbFallback.saveArticles(SEED_ARTICLES);
+    LocalDbFallback.saveAds(SEED_ADS);
+    LocalDbFallback.saveAuthors(SEED_AUTHORS);
+  }
+
+  if (shouldBypassFirestore()) {
+    console.log('Skipping Firestore seeding. Running in local fallback mode.');
+    return;
+  }
+
   try {
     if (!force && localStorage.getItem('skip_seeding') === 'true') {
       console.log('Auto-seeding is disabled because skip_seeding flag is active.');
@@ -161,13 +308,29 @@ export async function seedDatabaseIfEmpty(force = false) {
     // Save state to avoid future queries on refresh
     localStorage.setItem('pulsewire_db_seeded', 'true');
   } catch (error) {
-    console.error('Error seeding Firestore:', error);
-    handleFirestoreError(error, OperationType.LIST, pathForArticles);
+    console.error('Error seeding Firestore, using local fallback:', error);
+    flagFirestoreUnavailable(error);
   }
 }
 
 // Clear all data from the database
 export async function clearAllDatabaseData(): Promise<void> {
+  // Clear local DB fallback
+  try {
+    localStorage.removeItem('pulsewire_fallback_articles');
+    localStorage.removeItem('pulsewire_fallback_comments');
+    localStorage.removeItem('pulsewire_fallback_ads');
+    localStorage.removeItem('pulsewire_fallback_newsletter');
+    localStorage.removeItem('pulsewire_fallback_contacts');
+    localStorage.removeItem('pulsewire_fallback_authors');
+    localStorage.removeItem('pulsewire_db_seeded');
+  } catch (e) {}
+
+  if (shouldBypassFirestore()) {
+    console.log('Local database fallback cleared.');
+    return;
+  }
+
   try {
     // 1. Delete all articles and their comments subcollections
     const articlesCol = collection(db, 'articles');
@@ -205,28 +368,62 @@ export async function clearAllDatabaseData(): Promise<void> {
       await deleteDoc(doc(db, 'authors', d.id));
     }
 
-    console.log('All database data cleared successfully!');
+    console.log('All cloud database data cleared successfully!');
   } catch (error) {
-    console.error('Error clearing database:', error);
-    handleFirestoreError(error, OperationType.DELETE, 'all');
+    flagFirestoreUnavailable(error);
   }
 }
 
 // ---------------- Articles ----------------
 
+const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes cache duration
+const ARTICLE_TIMESTAMP_KEY = 'pulsewire_articles_last_fetch_time';
+
+export function getLastArticlesFetchTime(): number {
+  try {
+    const lastFetchTimeStr = localStorage.getItem(ARTICLE_TIMESTAMP_KEY);
+    return lastFetchTimeStr ? parseInt(lastFetchTimeStr, 10) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function getArticlesCacheDuration(): number {
+  return CACHE_DURATION_MS;
+}
+
 // Fetch all articles
-export async function getAllArticles(includeDrafts = false): Promise<Article[]> {
+export async function getAllArticles(includeDrafts = false, forceRefresh = false): Promise<Article[]> {
   const path = 'articles';
   let docs: Article[] = [];
-  try {
-    const colRef = collection(db, path);
-    // Use single-field query to avoid composite index requirements
-    const q = query(colRef, orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    docs = snapshot.docs.map(doc => doc.data() as Article);
-  } catch (error) {
-    console.warn("Firestore fetch failed, falling back to seed data:", error);
-    docs = SEED_ARTICLES;
+
+  const lastFetchTime = getLastArticlesFetchTime();
+  const isCacheValid = lastFetchTime && (Date.now() - lastFetchTime < CACHE_DURATION_MS);
+
+  if (shouldBypassFirestore()) {
+    docs = LocalDbFallback.getArticles();
+  } else if (!forceRefresh && isCacheValid) {
+    console.log(`[Cache Hit] Serving articles from local cache. Age: ${Math.round((Date.now() - lastFetchTime) / 1000)}s`);
+    docs = LocalDbFallback.getArticles();
+  } else {
+    try {
+      console.log(`[Cache Miss/Force] Fetching articles directly from Firestore...`);
+      const colRef = collection(db, path);
+      const q = query(colRef, orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      docs = snapshot.docs.map(doc => doc.data() as Article);
+      
+      // Update local storage cache and timestamp
+      if (docs.length > 0) {
+        LocalDbFallback.saveArticles(docs);
+        try {
+          localStorage.setItem(ARTICLE_TIMESTAMP_KEY, Date.now().toString());
+        } catch (e) {}
+      }
+    } catch (error) {
+      flagFirestoreUnavailable(error);
+      docs = LocalDbFallback.getArticles();
+    }
   }
   
   if (includeDrafts) {
@@ -236,20 +433,63 @@ export async function getAllArticles(includeDrafts = false): Promise<Article[]> 
   }
 }
 
+// Auto-publish any scheduled articles that are due
+export async function publishDueScheduledArticles(): Promise<number> {
+  try {
+    const all = await getAllArticles(true);
+    const now = new Date();
+    const due = all.filter(art => art.status === 'scheduled' && new Date(art.publishedAt) <= now);
+    
+    if (due.length === 0) return 0;
+    
+    console.log(`Publishing ${due.length} due scheduled articles...`);
+    for (const art of due) {
+      const updated = {
+        ...art,
+        status: 'published' as const,
+        updatedAt: now.toISOString()
+      };
+      await saveArticle(updated);
+    }
+    return due.length;
+  } catch (error) {
+    console.error("Error publishing due scheduled articles:", error);
+    return 0;
+  }
+}
+
 // Fetch articles by category
-export async function getArticlesByCategory(category: string): Promise<Article[]> {
+export async function getArticlesByCategory(category: string, forceRefresh = false): Promise<Article[]> {
   const path = 'articles';
   let list: Article[] = [];
-  try {
-    const colRef = collection(db, path);
-    // Use single-field query to avoid composite index requirements
-    const q = query(colRef, orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    list = snapshot.docs.map(doc => doc.data() as Article);
-  } catch (error) {
-    console.warn("Firestore fetch failed, falling back to seed data:", error);
-    list = SEED_ARTICLES;
+
+  const lastFetchTime = getLastArticlesFetchTime();
+  const isCacheValid = lastFetchTime && (Date.now() - lastFetchTime < CACHE_DURATION_MS);
+
+  if (shouldBypassFirestore()) {
+    list = LocalDbFallback.getArticles();
+  } else if (!forceRefresh && isCacheValid) {
+    console.log(`[Cache Hit] Serving category articles from local cache.`);
+    list = LocalDbFallback.getArticles();
+  } else {
+    try {
+      console.log(`[Cache Miss/Force] Fetching articles for category from Firestore...`);
+      const colRef = collection(db, path);
+      const q = query(colRef, orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      list = snapshot.docs.map(doc => doc.data() as Article);
+      if (list.length > 0) {
+        LocalDbFallback.saveArticles(list);
+        try {
+          localStorage.setItem(ARTICLE_TIMESTAMP_KEY, Date.now().toString());
+        } catch (e) {}
+      }
+    } catch (error) {
+      flagFirestoreUnavailable(error);
+      list = LocalDbFallback.getArticles();
+    }
   }
+
   return list.filter(art => {
     if (art.status !== 'published') return false;
     const cats = art.categories && art.categories.length > 0 ? art.categories : [art.category];
@@ -258,56 +498,118 @@ export async function getArticlesByCategory(category: string): Promise<Article[]
 }
 
 // Fetch single article by slug
-export async function getArticleBySlug(slug: string): Promise<Article | null> {
+export async function getArticleBySlug(slug: string, forceRefresh = false): Promise<Article | null> {
   const path = 'articles';
+
+  const lastFetchTime = getLastArticlesFetchTime();
+  const isCacheValid = lastFetchTime && (Date.now() - lastFetchTime < CACHE_DURATION_MS);
+  const local = LocalDbFallback.getArticles();
+  const cachedArt = local.find(a => a.slug === slug);
+
+  if (shouldBypassFirestore()) {
+    return cachedArt || null;
+  }
+
+  if (!forceRefresh && isCacheValid && cachedArt) {
+    console.log(`[Cache Hit] Serving article details from local cache for slug: ${slug}`);
+    return cachedArt;
+  }
+
   try {
+    console.log(`[Cache Miss/Force] Fetching article details from Firestore for slug: ${slug}`);
     const colRef = collection(db, path);
     const q = query(colRef, where('slug', '==', slug), limit(1));
     const snapshot = await getDocs(q);
-    if (snapshot.empty) return SEED_ARTICLES.find(a => a.slug === slug) || null;
-    return snapshot.docs[0].data() as Article;
+    if (snapshot.empty) {
+      return cachedArt || null;
+    }
+    const fetchedArt = snapshot.docs[0].data() as Article;
+    
+    // Update local cache for this article
+    const index = local.findIndex(a => a.id === fetchedArt.id);
+    if (index !== -1) {
+      local[index] = fetchedArt;
+    } else {
+      local.push(fetchedArt);
+    }
+    LocalDbFallback.saveArticles(local);
+    
+    return fetchedArt;
   } catch (error) {
-    console.warn("Firestore fetch failed, falling back to seed data:", error);
-    return SEED_ARTICLES.find(a => a.slug === slug) || null;
+    flagFirestoreUnavailable(error);
+    return cachedArt || null;
   }
 }
 
 // Increment article view count
 export async function incrementArticleViews(articleId: string) {
   const path = `articles/${articleId}`;
+
+  // Always apply changes locally first
+  const local = LocalDbFallback.getArticles();
+  const index = local.findIndex(a => a.id === articleId);
+  if (index !== -1) {
+    local[index].views = (local[index].views || 0) + 1;
+    LocalDbFallback.saveArticles(local);
+  }
+
+  if (shouldBypassFirestore()) return;
+
   try {
     const docRef = doc(db, 'articles', articleId);
     await updateDoc(docRef, {
       views: increment(1)
     });
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
+    flagFirestoreUnavailable(error);
   }
 }
 
 // Increment article likes count
 export async function incrementArticleLikes(articleId: string) {
   const path = `articles/${articleId}`;
+
+  // Always apply changes locally first
+  const local = LocalDbFallback.getArticles();
+  const index = local.findIndex(a => a.id === articleId);
+  if (index !== -1) {
+    local[index].likes = (local[index].likes || 0) + 1;
+    LocalDbFallback.saveArticles(local);
+  }
+
+  if (shouldBypassFirestore()) return;
+
   try {
     const docRef = doc(db, 'articles', articleId);
     await updateDoc(docRef, {
       likes: increment(1)
     });
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
+    flagFirestoreUnavailable(error);
   }
 }
 
 // Increment article social shares count
 export async function incrementArticleShares(articleId: string) {
   const path = `articles/${articleId}`;
+
+  // Always apply changes locally first
+  const local = LocalDbFallback.getArticles();
+  const index = local.findIndex(a => a.id === articleId);
+  if (index !== -1) {
+    local[index].shareCount = (local[index].shareCount || 0) + 1;
+    LocalDbFallback.saveArticles(local);
+  }
+
+  if (shouldBypassFirestore()) return;
+
   try {
     const docRef = doc(db, 'articles', articleId);
     await updateDoc(docRef, {
       shareCount: increment(1)
     });
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
+    flagFirestoreUnavailable(error);
   }
 }
 
@@ -337,21 +639,42 @@ function cleanUndefined<T>(obj: T): T {
 // Save or edit article
 export async function saveArticle(article: Article): Promise<void> {
   const path = `articles/${article.id}`;
+
+  // Always apply locally first
+  const local = LocalDbFallback.getArticles();
+  const index = local.findIndex(a => a.id === article.id);
+  if (index !== -1) {
+    local[index] = article;
+  } else {
+    local.push(article);
+  }
+  LocalDbFallback.saveArticles(local);
+
+  if (shouldBypassFirestore()) return;
+
   try {
     const docRef = doc(db, 'articles', article.id);
     await setDoc(docRef, cleanUndefined(article));
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    flagFirestoreUnavailable(error);
   }
 }
 
 // Delete article
 export async function deleteArticle(articleId: string): Promise<void> {
   const path = `articles/${articleId}`;
+
+  // Always apply locally first
+  const local = LocalDbFallback.getArticles();
+  const filtered = local.filter(a => a.id !== articleId);
+  LocalDbFallback.saveArticles(filtered);
+
+  if (shouldBypassFirestore()) return;
+
   try {
     await deleteDoc(doc(db, 'articles', articleId));
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
+    flagFirestoreUnavailable(error);
   }
 }
 
@@ -360,78 +683,143 @@ export async function deleteArticle(articleId: string): Promise<void> {
 // Fetch comments for an article
 export async function getCommentsForArticle(articleId: string): Promise<Comment[]> {
   const path = `articles/${articleId}/comments`;
+
+  if (shouldBypassFirestore()) {
+    const localComments = LocalDbFallback.getComments();
+    return localComments.filter(c => c.articleId === articleId && c.approved);
+  }
+
   try {
     const subColRef = collection(db, 'articles', articleId, 'comments');
     const q = query(subColRef, where('approved', '==', true), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.data() as Comment);
+    const comments = snapshot.docs.map(doc => doc.data() as Comment);
+    
+    // Merge into local cache
+    const cachedComments = LocalDbFallback.getComments().filter(c => c.articleId !== articleId);
+    LocalDbFallback.saveComments([...cachedComments, ...comments]);
+
+    return comments;
   } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    flagFirestoreUnavailable(error);
+    const localComments = LocalDbFallback.getComments();
+    return localComments.filter(c => c.articleId === articleId && c.approved);
   }
 }
 
 // Fetch all comments (for Admin panel review)
 export async function getAllCommentsAcrossArticles(): Promise<(Comment & { articleTitle?: string })[]> {
   const path = 'articles';
-  try {
-    // First, get all articles to correlate titles
-    const articles = await getAllArticles(true);
-    const commentsList: (Comment & { articleTitle?: string })[] = [];
 
-    for (const art of articles) {
-      const subColPath = `articles/${art.id}/comments`;
-      try {
-        const subColRef = collection(db, 'articles', art.id, 'comments');
-        const snapshot = await getDocs(subColRef);
-        snapshot.docs.forEach(doc => {
-          const commentData = doc.data() as Comment;
-          commentsList.push({
-            ...commentData,
-            articleTitle: art.title
-          });
-        });
-      } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, subColPath);
-      }
+  if (shouldBypassFirestore()) {
+    const articles = await getAllArticles(true);
+    const comments = LocalDbFallback.getComments();
+    const map = new Map(articles.map(a => [a.id, a.title]));
+    return comments.map(c => ({
+      ...c,
+      articleTitle: map.get(c.articleId) || 'Unknown Publication'
+    })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  try {
+    // 1. Fetch all articles to map IDs to titles
+    const articles = await getAllArticles(true);
+    const articlesMap = new Map(articles.map(a => [a.id, a.title]));
+
+    // 2. Fetch all comments from all articles in a SINGLE Collection Group query
+    const commentsGroupRef = collectionGroup(db, 'comments');
+    const q = query(commentsGroupRef, orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+
+    const commentsList: (Comment & { articleTitle?: string })[] = snapshot.docs.map(doc => {
+      const commentData = doc.data() as Comment;
+      return {
+        ...commentData,
+        articleTitle: articlesMap.get(commentData.articleId) || 'PulseWire Publication'
+      };
+    });
+
+    // Update comments cache
+    const rawComments = commentsList.map(({ articleTitle, ...rest }) => rest);
+    if (rawComments.length > 0) {
+      LocalDbFallback.saveComments(rawComments);
     }
 
-    // Sort by createdAt descending
-    return commentsList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return commentsList;
   } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    flagFirestoreUnavailable(error);
+    const articles = await getAllArticles(true);
+    const comments = LocalDbFallback.getComments();
+    const map = new Map(articles.map(a => [a.id, a.title]));
+    return comments.map(c => ({
+      ...c,
+      articleTitle: map.get(c.articleId) || 'Unknown Publication'
+    })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 }
 
 // Add comment to article
 export async function addCommentToArticle(articleId: string, comment: Comment): Promise<void> {
   const path = `articles/${articleId}/comments/${comment.id}`;
+
+  // Always apply locally first
+  const comments = LocalDbFallback.getComments();
+  const index = comments.findIndex(c => c.id === comment.id);
+  if (index !== -1) {
+    comments[index] = comment;
+  } else {
+    comments.push(comment);
+  }
+  LocalDbFallback.saveComments(comments);
+
+  if (shouldBypassFirestore()) return;
+
   try {
     const docRef = doc(db, 'articles', articleId, 'comments', comment.id);
     await setDoc(docRef, cleanUndefined(comment));
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    flagFirestoreUnavailable(error);
   }
 }
 
 // Approve comment
 export async function approveComment(articleId: string, commentId: string): Promise<void> {
   const path = `articles/${articleId}/comments/${commentId}`;
+
+  // Always apply locally first
+  const comments = LocalDbFallback.getComments();
+  const index = comments.findIndex(c => c.id === commentId);
+  if (index !== -1) {
+    comments[index].approved = true;
+    LocalDbFallback.saveComments(comments);
+  }
+
+  if (shouldBypassFirestore()) return;
+
   try {
     const docRef = doc(db, 'articles', articleId, 'comments', commentId);
     await updateDoc(docRef, { approved: true });
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
+    flagFirestoreUnavailable(error);
   }
 }
 
 // Delete comment
 export async function deleteComment(articleId: string, commentId: string): Promise<void> {
   const path = `articles/${articleId}/comments/${commentId}`;
+
+  // Always apply locally first
+  const comments = LocalDbFallback.getComments();
+  const filtered = comments.filter(c => c.id !== commentId);
+  LocalDbFallback.saveComments(filtered);
+
+  if (shouldBypassFirestore()) return;
+
   try {
     const docRef = doc(db, 'articles', articleId, 'comments', commentId);
     await deleteDoc(docRef);
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
+    flagFirestoreUnavailable(error);
   }
 }
 
@@ -441,27 +829,45 @@ export async function deleteComment(articleId: string, commentId: string): Promi
 export async function subscribeNewsletter(email: string): Promise<void> {
   const hashedEmail = email.toLowerCase().replace(/[^a-z0-9]/g, '_');
   const path = `newsletter/${hashedEmail}`;
+  const subscription: NewsletterSubscription = {
+    email: email.toLowerCase().trim(),
+    subscribedAt: new Date().toISOString()
+  };
+
+  // Always apply locally first
+  const subs = LocalDbFallback.getNewsletter();
+  if (!subs.some(s => s.email === subscription.email)) {
+    subs.push(subscription);
+    LocalDbFallback.saveNewsletter(subs);
+  }
+
+  if (shouldBypassFirestore()) return;
+
   try {
     const docRef = doc(db, 'newsletter', hashedEmail);
-    const subscription: NewsletterSubscription = {
-      email: email.toLowerCase().trim(),
-      subscribedAt: new Date().toISOString()
-    };
     await setDoc(docRef, subscription);
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    flagFirestoreUnavailable(error);
   }
 }
 
 // Fetch all newsletter subscribers for Admin
 export async function getNewsletterSubscribers(): Promise<NewsletterSubscription[]> {
   const path = 'newsletter';
+
+  if (shouldBypassFirestore()) {
+    return LocalDbFallback.getNewsletter();
+  }
+
   try {
     const colRef = collection(db, 'newsletter');
     const snapshot = await getDocs(query(colRef, orderBy('subscribedAt', 'desc')));
-    return snapshot.docs.map(doc => doc.data() as NewsletterSubscription);
+    const list = snapshot.docs.map(doc => doc.data() as NewsletterSubscription);
+    LocalDbFallback.saveNewsletter(list);
+    return list;
   } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    flagFirestoreUnavailable(error);
+    return LocalDbFallback.getNewsletter();
   }
 }
 
@@ -470,53 +876,100 @@ export async function getNewsletterSubscribers(): Promise<NewsletterSubscription
 // Fetch active ads
 export async function getActiveAds(): Promise<AdPlacement[]> {
   const path = 'ads';
+
+  if (shouldBypassFirestore()) {
+    return LocalDbFallback.getAds().filter(ad => ad.active);
+  }
+
   try {
     const colRef = collection(db, path);
     const q = query(colRef, where('active', '==', true));
     const snapshot = await getDocs(q);
     if (snapshot.empty) return SEED_ADS.filter(ad => ad.active);
-    return snapshot.docs.map(doc => doc.data() as AdPlacement);
+    const ads = snapshot.docs.map(doc => doc.data() as AdPlacement);
+    LocalDbFallback.saveAds(ads);
+    return ads;
   } catch (error) {
-    console.warn("Firestore fetch failed, falling back to seed ads:", error);
-    return SEED_ADS.filter(ad => ad.active);
+    flagFirestoreUnavailable(error);
+    return LocalDbFallback.getAds().filter(ad => ad.active);
   }
 }
 
 // Fetch all ads (for admin)
 export async function getAllAds(): Promise<AdPlacement[]> {
   const path = 'ads';
+
+  if (shouldBypassFirestore()) {
+    return LocalDbFallback.getAds();
+  }
+
   try {
     const colRef = collection(db, path);
     const snapshot = await getDocs(colRef);
-    return snapshot.docs.map(doc => doc.data() as AdPlacement);
+    const ads = snapshot.docs.map(doc => doc.data() as AdPlacement);
+    LocalDbFallback.saveAds(ads);
+    return ads;
   } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    flagFirestoreUnavailable(error);
+    return LocalDbFallback.getAds();
   }
 }
 
 // Add/Save ad
 export async function saveAd(ad: AdPlacement): Promise<void> {
   const path = `ads/${ad.id}`;
+
+  // Always apply locally first
+  const ads = LocalDbFallback.getAds();
+  const index = ads.findIndex(a => a.id === ad.id);
+  if (index !== -1) {
+    ads[index] = ad;
+  } else {
+    ads.push(ad);
+  }
+  LocalDbFallback.saveAds(ads);
+
+  if (shouldBypassFirestore()) return;
+
   try {
     await setDoc(doc(db, 'ads', ad.id), cleanUndefined(ad));
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    flagFirestoreUnavailable(error);
   }
 }
 
 // Delete ad
 export async function deleteAd(adId: string): Promise<void> {
   const path = `ads/${adId}`;
+
+  // Always apply locally first
+  const ads = LocalDbFallback.getAds();
+  const filtered = ads.filter(a => a.id !== adId);
+  LocalDbFallback.saveAds(filtered);
+
+  if (shouldBypassFirestore()) return;
+
   try {
     await deleteDoc(doc(db, 'ads', adId));
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
+    flagFirestoreUnavailable(error);
   }
 }
 
 // Log impression
 export async function logAdImpression(adId: string): Promise<void> {
   const path = `ads/${adId}`;
+
+  // Always apply locally first
+  const ads = LocalDbFallback.getAds();
+  const index = ads.findIndex(a => a.id === adId);
+  if (index !== -1) {
+    ads[index].impressions = (ads[index].impressions || 0) + 1;
+    LocalDbFallback.saveAds(ads);
+  }
+
+  if (shouldBypassFirestore()) return;
+
   try {
     const docRef = doc(db, 'ads', adId);
     await updateDoc(docRef, {
@@ -534,6 +987,17 @@ export async function logAdImpression(adId: string): Promise<void> {
 // Log click
 export async function logAdClick(adId: string): Promise<void> {
   const path = `ads/${adId}`;
+
+  // Always apply locally first
+  const ads = LocalDbFallback.getAds();
+  const index = ads.findIndex(a => a.id === adId);
+  if (index !== -1) {
+    ads[index].clicks = (ads[index].clicks || 0) + 1;
+    LocalDbFallback.saveAds(ads);
+  }
+
+  if (shouldBypassFirestore()) return;
+
   try {
     const docRef = doc(db, 'ads', adId);
     await updateDoc(docRef, {
@@ -551,11 +1015,19 @@ export async function logAdClick(adId: string): Promise<void> {
 // Submit contact message to firestore db
 export async function submitContactMessage(msg: ContactMessage): Promise<void> {
   const path = 'contacts';
+
+  // Always apply locally first
+  const msgs = LocalDbFallback.getContacts();
+  msgs.push(msg);
+  LocalDbFallback.saveContacts(msgs);
+
+  if (shouldBypassFirestore()) return;
+
   try {
     const colRef = collection(db, 'contacts');
     await addDoc(colRef, msg);
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    flagFirestoreUnavailable(error);
   }
 }
 
@@ -564,59 +1036,119 @@ export async function submitContactMessage(msg: ContactMessage): Promise<void> {
 // Fetch all authors/user profiles
 export async function getAllAuthors(): Promise<Author[]> {
   const path = 'authors';
+
+  if (shouldBypassFirestore()) {
+    return LocalDbFallback.getAuthors();
+  }
+
   try {
     const colRef = collection(db, path);
     const snapshot = await getDocs(colRef);
-    return snapshot.docs.map(doc => doc.data() as Author);
+    const list = snapshot.docs.map(doc => doc.data() as Author);
+    LocalDbFallback.saveAuthors(list);
+    return list;
   } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
-    return [];
+    flagFirestoreUnavailable(error);
+    return LocalDbFallback.getAuthors();
   }
 }
 
 // Fetch single author profile by ID
 export async function getAuthorById(authorId: string): Promise<Author | null> {
   const path = `authors/${authorId}`;
+
+  if (shouldBypassFirestore()) {
+    const list = LocalDbFallback.getAuthors();
+    return list.find(a => a.id === authorId) || null;
+  }
+
   try {
     const docRef = doc(db, 'authors', authorId);
     const snapshot = await getDoc(docRef);
-    if (!snapshot.exists()) return null;
-    return snapshot.data() as Author;
+    if (!snapshot.exists()) {
+      const list = LocalDbFallback.getAuthors();
+      return list.find(a => a.id === authorId) || null;
+    }
+    const author = snapshot.data() as Author;
+    
+    // Save to cache
+    const list = LocalDbFallback.getAuthors();
+    const idx = list.findIndex(a => a.id === authorId);
+    if (idx !== -1) {
+      list[idx] = author;
+    } else {
+      list.push(author);
+    }
+    LocalDbFallback.saveAuthors(list);
+
+    return author;
   } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return null;
+    flagFirestoreUnavailable(error);
+    const list = LocalDbFallback.getAuthors();
+    return list.find(a => a.id === authorId) || null;
   }
 }
 
 // Save or edit author profile
 export async function saveAuthor(author: Author): Promise<void> {
   const path = `authors/${author.id}`;
+
+  // Always apply locally first
+  const list = LocalDbFallback.getAuthors();
+  const idx = list.findIndex(a => a.id === author.id);
+  if (idx !== -1) {
+    list[idx] = author;
+  } else {
+    list.push(author);
+  }
+  LocalDbFallback.saveAuthors(list);
+
+  if (shouldBypassFirestore()) return;
+
   try {
     const docRef = doc(db, 'authors', author.id);
     await setDoc(docRef, cleanUndefined(author));
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    flagFirestoreUnavailable(error);
   }
 }
 
 // Delete author profile
 export async function deleteAuthor(authorId: string): Promise<void> {
   const path = `authors/${authorId}`;
+
+  // Always apply locally first
+  const list = LocalDbFallback.getAuthors();
+  const filtered = list.filter(a => a.id !== authorId);
+  LocalDbFallback.saveAuthors(filtered);
+
+  if (shouldBypassFirestore()) return;
+
   try {
     await deleteDoc(doc(db, 'authors', authorId));
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
+    flagFirestoreUnavailable(error);
   }
 }
 
 // Update author status (for approval workflow)
 export async function updateAuthorStatus(authorId: string, status: 'approved' | 'pending'): Promise<void> {
   const path = `authors/${authorId}`;
+
+  // Always apply locally first
+  const list = LocalDbFallback.getAuthors();
+  const idx = list.findIndex(a => a.id === authorId);
+  if (idx !== -1) {
+    list[idx].status = status;
+    LocalDbFallback.saveAuthors(list);
+  }
+
+  if (shouldBypassFirestore()) return;
+
   try {
     const docRef = doc(db, 'authors', authorId);
     await updateDoc(docRef, { status });
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
+    flagFirestoreUnavailable(error);
   }
 }
-

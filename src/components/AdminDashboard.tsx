@@ -112,6 +112,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
   const [editorImageAlt, setEditorImageAlt] = useState('');
   const [editorImages, setEditorImages] = useState<string[]>([]);
   const [editorStatus, setEditorStatus] = useState<'draft' | 'published' | 'scheduled'>('draft');
+  const [editorPublishedAt, setEditorPublishedAt] = useState('');
   const [editorIsSponsored, setEditorIsSponsored] = useState(false);
   const [editorIsAffiliate, setEditorIsAffiliate] = useState(false);
   const [editorSponsorName, setEditorSponsorName] = useState('');
@@ -360,6 +361,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
     setEditorImageAlt('');
     setEditorImages([]);
     setEditorStatus('draft');
+    setEditorPublishedAt(new Date().toISOString());
     setEditorIsSponsored(false);
     setEditorIsAffiliate(false);
     setEditorSponsorName('');
@@ -382,6 +384,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
     setEditorImageAlt(art.imageAlt || '');
     setEditorImages(art.images || []);
     setEditorStatus(art.status);
+    setEditorPublishedAt(art.publishedAt || new Date().toISOString());
     setEditorIsSponsored(art.isSponsored);
     setEditorIsAffiliate(art.isAffiliate);
     setEditorSponsorName(art.sponsorName || '');
@@ -438,7 +441,9 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
       authorId: editorAuthorId,
       authorName: editorAuthorName,
       updatedAt: new Date().toISOString(),
-      publishedAt: editorStatus === 'published' && editingArticle.status !== 'published' ? new Date().toISOString() : editingArticle.publishedAt
+      publishedAt: editorStatus === 'scheduled' 
+        ? (editorPublishedAt || editingArticle?.publishedAt || new Date().toISOString())
+        : (editorStatus === 'published' && editingArticle?.status !== 'published' ? new Date().toISOString() : (editingArticle?.publishedAt || new Date().toISOString()))
     };
 
     try {
@@ -1299,6 +1304,37 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                       <option value="scheduled">Scheduled Publish</option>
                     </select>
                   </div>
+
+                  {editorStatus === 'scheduled' && (
+                    <div className="mt-3">
+                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                        Scheduled Publish Date & Time
+                      </label>
+                      <input 
+                        type="datetime-local"
+                        value={(() => {
+                          if (!editorPublishedAt) return '';
+                          try {
+                            const d = new Date(editorPublishedAt);
+                            const pad = (num: number) => String(num).padStart(2, '0');
+                            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                          } catch (e) {
+                            return '';
+                          }
+                        })()}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (val) {
+                            setEditorPublishedAt(new Date(val).toISOString());
+                          }
+                        }}
+                        className="w-full px-3 py-2 rounded bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:outline-none focus:ring-1 focus:ring-red-500 text-gray-900 dark:text-white font-mono"
+                      />
+                      <p className="text-[10px] text-gray-500 mt-1">
+                        The article will be automatically published at this time.
+                      </p>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 font-mono">

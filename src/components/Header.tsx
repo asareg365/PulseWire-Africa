@@ -21,7 +21,8 @@ import {
   Lock, 
   LogOut, 
   Activity,
-  Bookmark
+  Bookmark,
+  RefreshCw
 } from 'lucide-react';
 import { CATEGORIES, Author } from '../types';
 import Logo from './Logo';
@@ -36,6 +37,9 @@ interface HeaderProps {
   isAdmin: boolean;
   setIsAdmin: (admin: boolean) => void;
   onSearch: (query: string) => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  lastFetchTime?: number;
 }
 
 export default function Header({ 
@@ -45,7 +49,10 @@ export default function Header({
   setDarkMode, 
   isAdmin, 
   setIsAdmin,
-  onSearch
+  onSearch,
+  onRefresh,
+  refreshing = false,
+  lastFetchTime = 0
 }: HeaderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -234,6 +241,22 @@ export default function Header({
             <Search className="h-5 w-5" />
           </button>
 
+          {/* Manual Refresh Trigger */}
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              disabled={refreshing}
+              className={`p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none ${
+                refreshing ? 'cursor-not-allowed opacity-65' : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+              }`}
+              title="Refresh Publications Cache"
+              aria-label="Refresh news"
+              id="btn-manual-refresh"
+            >
+              <RefreshCw className={`h-4.5 w-4.5 ${refreshing ? 'animate-spin text-emerald-600' : ''}`} />
+            </button>
+          )}
+
           {/* Global Theme Toggle */}
           <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
 
@@ -326,6 +349,18 @@ export default function Header({
                 {cat.name}
               </button>
             ))}
+
+            {/* Cache status info in desktop navigation */}
+            {lastFetchTime > 0 && (
+              <div className="ml-auto hidden lg:flex items-center space-x-1.5 text-[10px] font-mono text-slate-400 dark:text-gray-500 select-none pr-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>
+                  CACHE: {Math.round((Date.now() - lastFetchTime) / 60000) <= 0 
+                    ? 'JUST NOW' 
+                    : `${Math.round((Date.now() - lastFetchTime) / 60000)}M AGO`}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </nav>

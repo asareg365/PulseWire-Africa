@@ -50,6 +50,8 @@ export interface Comment {
   content: string;
   createdAt: string;
   approved: boolean;
+  parentId?: string;
+  replyTo?: string;
 }
 
 export interface AdPlacement {

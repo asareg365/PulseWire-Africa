@@ -55,6 +55,7 @@ const AUTHOR_PROFILES: Record<string, AuthorProfile> = {
 interface AuthorBioCardProps {
   authorName: string;
   onSearchAuthor: (name: string) => void;
+  onNavigateAuthor?: (name: string) => void;
 }
 
 export function getAuthorProfileDetails(authorName: string): { name: string } & AuthorProfile {
@@ -86,7 +87,7 @@ export function getAuthorProfileDetails(authorName: string): { name: string } & 
   };
 }
 
-export default function AuthorBioCard({ authorName, onSearchAuthor }: AuthorBioCardProps) {
+export default function AuthorBioCard({ authorName, onSearchAuthor, onNavigateAuthor }: AuthorBioCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [profile, setProfile] = useState(() => getAuthorProfileDetails(authorName));
 
@@ -132,17 +133,27 @@ export default function AuthorBioCard({ authorName, onSearchAuthor }: AuthorBioC
       <div className="p-5">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <img 
-              src={profile.avatar} 
-              alt={profile.name} 
-              className="w-12 h-12 rounded-full object-cover border-2 border-white dark:border-gray-800 shadow-sm shrink-0"
-              referrerPolicy="no-referrer"
-            />
+            <button
+              onClick={() => onNavigateAuthor?.(profile.name)}
+              className="cursor-pointer shrink-0 transition-transform hover:scale-105 active:scale-95"
+              title={`View ${profile.name}'s Profile`}
+            >
+              <img 
+                src={profile.avatar} 
+                alt={profile.name} 
+                className="w-12 h-12 rounded-full object-cover border-2 border-white dark:border-gray-800 shadow-sm shrink-0"
+                referrerPolicy="no-referrer"
+              />
+            </button>
             <div>
               <div className="flex items-center gap-1.5">
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white font-sans">
+                <button
+                  onClick={() => onNavigateAuthor?.(profile.name)}
+                  className="text-sm font-bold text-slate-900 dark:text-white font-sans hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer hover:underline"
+                  title={`View ${profile.name}'s Profile`}
+                >
                   {profile.name}
-                </h4>
+                </button>
                 <Award className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-500" />
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-mono tracking-tight mt-0.5">

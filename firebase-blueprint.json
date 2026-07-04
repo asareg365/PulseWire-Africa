@@ -56,7 +56,9 @@
         "authorAvatar": { "type": "string" },
         "content": { "type": "string" },
         "createdAt": { "type": "string" },
-        "approved": { "type": "boolean" }
+        "approved": { "type": "boolean" },
+        "parentId": { "type": "string" },
+        "replyTo": { "type": "string" }
       },
       "required": ["id", "articleId", "authorName", "content", "createdAt", "approved"]
     },
