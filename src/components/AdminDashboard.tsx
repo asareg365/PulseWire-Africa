@@ -49,6 +49,7 @@ import {
   Users
 } from 'lucide-react';
 import ImageEditorOverlay from './ImageEditorOverlay';
+import { uploadOptimizedImageToFirebase } from '../lib/imageUtils';
 
 interface AdminDashboardProps {
   navigate: (path: string) => void;
@@ -117,6 +118,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
   const [editorIsAffiliate, setEditorIsAffiliate] = useState(false);
   const [editorSponsorName, setEditorSponsorName] = useState('');
   const [editorAffiliateLink, setEditorAffiliateLink] = useState('');
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
 
   // AI assistant states
   const [aiLoading, setAiLoading] = useState(false);
@@ -3030,23 +3032,60 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
           setImageEditorOpen(false);
           setImageToEdit('');
         }}
-        onSave={(editedImage) => {
-          if (activeImageTarget === 'cover') {
-            setEditorFeaturedImage(editedImage);
-          } else if (activeImageTarget === 'ad') {
-            setAdImageUrl(editedImage);
-          } else if (activeImageTarget === 'gallery') {
-            if (!editorImages.includes(editedImage)) {
-              setEditorImages([...editorImages, editedImage]);
+        onSave={async (editedImage) => {
+          setIsUploadingMedia(true);
+          try {
+            // Select folder and contextual naming parameter based on upload target
+            const folder = activeImageTarget === 'cover' ? 'articles'
+                         : activeImageTarget === 'ad' ? 'ads'
+                         : activeImageTarget === 'author' ? 'authors'
+                         : 'gallery';
+            
+            let customName = '';
+            if (activeImageTarget === 'cover') {
+              customName = editorTitle;
+            } else if (activeImageTarget === 'ad') {
+              customName = adTitle;
+            } else if (activeImageTarget === 'author') {
+              customName = authorNameInput;
+            } else if (activeImageTarget === 'gallery') {
+              customName = editorTitle ? `${editorTitle}-gallery` : 'gallery';
             }
-          } else if (activeImageTarget === 'author') {
-            setAuthorAvatarInput(editedImage);
+
+            // Upload the compressed & optimized webp file directly to storage using our advanced naming engine!
+            const optimizedUrl = await uploadOptimizedImageToFirebase(editedImage, folder, customName);
+            
+            if (activeImageTarget === 'cover') {
+              setEditorFeaturedImage(optimizedUrl);
+            } else if (activeImageTarget === 'ad') {
+              setAdImageUrl(optimizedUrl);
+            } else if (activeImageTarget === 'gallery') {
+              if (!editorImages.includes(optimizedUrl)) {
+                setEditorImages([...editorImages, optimizedUrl]);
+              }
+            } else if (activeImageTarget === 'author') {
+              setAuthorAvatarInput(optimizedUrl);
+            }
+          } catch (e) {
+            console.error('Failed to optimize or upload image:', e);
+          } finally {
+            setIsUploadingMedia(false);
+            setImageEditorOpen(false);
+            setImageToEdit('');
           }
-          setImageEditorOpen(false);
-          setImageToEdit('');
         }}
         title={activeImageTarget === 'cover' ? "Adjust Cover Photo Framing & Filters" : "Adjust Image Framing & Filters"}
       />
+
+      {isUploadingMedia && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center gap-4 text-white">
+          <div className="h-12 w-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          <div className="text-center px-4">
+            <h3 className="text-lg font-bold tracking-tight">Optimizing & Uploading Media</h3>
+            <p className="text-xs text-gray-400 font-mono mt-1">Compressing image & publishing WebP to Firebase Storage...</p>
+          </div>
+        </div>
+      )}
 
     </div>
   );

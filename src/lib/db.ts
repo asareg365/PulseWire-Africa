@@ -206,6 +206,19 @@ export function resetFirestoreFallback() {
   } catch (e) {}
 }
 
+// Resilient promise timeout helper to prevent hanging queries on slow connections
+async function withTimeout<T>(promise: Promise<T>, timeoutMs = 2500): Promise<T> {
+  let timeoutId: any;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error("Firestore operation timed out"));
+    }, timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timeoutId);
+  });
+}
+
 // Seeding function
 export async function seedDatabaseIfEmpty(force = false) {
   const pathForArticles = 'articles';
@@ -235,7 +248,7 @@ export async function seedDatabaseIfEmpty(force = false) {
     }
 
     const articlesCol = collection(db, pathForArticles);
-    const qSnapshot = await getDocs(query(articlesCol, limit(1)));
+    const qSnapshot = await withTimeout(getDocs(query(articlesCol, limit(1))));
     
     if (qSnapshot.empty || force) {
       console.log('Starting seeding of PulseWire Africa demo database...');
@@ -341,12 +354,12 @@ export async function clearAllDatabaseData(): Promise<void> {
   try {
     // 1. Delete all articles and their comments subcollections
     const articlesCol = collection(db, 'articles');
-    const articlesSnapshot = await getDocs(articlesCol);
+    const articlesSnapshot = await withTimeout(getDocs(articlesCol));
     for (const d of articlesSnapshot.docs) {
       const artId = d.id;
       // Get and delete comments subcollection
       const commentsCol = collection(db, 'articles', artId, 'comments');
-      const commentsSnapshot = await getDocs(commentsCol);
+      const commentsSnapshot = await withTimeout(getDocs(commentsCol));
       for (const cd of commentsSnapshot.docs) {
         await deleteDoc(doc(db, 'articles', artId, 'comments', cd.id));
       }
@@ -356,21 +369,21 @@ export async function clearAllDatabaseData(): Promise<void> {
 
     // 2. Delete all ads
     const adsCol = collection(db, 'ads');
-    const adsSnapshot = await getDocs(adsCol);
+    const adsSnapshot = await withTimeout(getDocs(adsCol));
     for (const d of adsSnapshot.docs) {
       await deleteDoc(doc(db, 'ads', d.id));
     }
 
     // 3. Delete all newsletter subscriptions
     const newsCol = collection(db, 'newsletter');
-    const newsSnapshot = await getDocs(newsCol);
+    const newsSnapshot = await withTimeout(getDocs(newsCol));
     for (const d of newsSnapshot.docs) {
       await deleteDoc(doc(db, 'newsletter', d.id));
     }
 
     // 4. Delete all authors
     const authorsCol = collection(db, 'authors');
-    const authorsSnapshot = await getDocs(authorsCol);
+    const authorsSnapshot = await withTimeout(getDocs(authorsCol));
     for (const d of authorsSnapshot.docs) {
       await deleteDoc(doc(db, 'authors', d.id));
     }
@@ -417,7 +430,7 @@ export async function getAllArticles(includeDrafts = false, forceRefresh = false
       console.log(`[Cache Miss/Force] Fetching articles directly from Firestore...`);
       const colRef = collection(db, path);
       const q = query(colRef, orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
+      const snapshot = await withTimeout(getDocs(q));
       docs = snapshot.docs.map(doc => doc.data() as Article);
       
       // Update local storage cache and timestamp
@@ -483,7 +496,7 @@ export async function getArticlesByCategory(category: string, forceRefresh = fal
       console.log(`[Cache Miss/Force] Fetching articles for category from Firestore...`);
       const colRef = collection(db, path);
       const q = query(colRef, orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
+      const snapshot = await withTimeout(getDocs(q));
       list = snapshot.docs.map(doc => doc.data() as Article);
       if (list.length > 0) {
         LocalDbFallback.saveArticles(list);
@@ -526,7 +539,7 @@ export async function getArticleBySlug(slug: string, forceRefresh = false): Prom
     console.log(`[Cache Miss/Force] Fetching article details from Firestore for slug: ${slug}`);
     const colRef = collection(db, path);
     const q = query(colRef, where('slug', '==', slug), limit(1));
-    const snapshot = await getDocs(q);
+    const snapshot = await withTimeout(getDocs(q));
     if (snapshot.empty) {
       return cachedArt || null;
     }
@@ -699,7 +712,7 @@ export async function getCommentsForArticle(articleId: string): Promise<Comment[
   try {
     const subColRef = collection(db, 'articles', articleId, 'comments');
     const q = query(subColRef, where('approved', '==', true), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
+    const snapshot = await withTimeout(getDocs(q));
     const comments = snapshot.docs.map(doc => doc.data() as Comment);
     
     // Merge into local cache
@@ -736,7 +749,7 @@ export async function getAllCommentsAcrossArticles(): Promise<(Comment & { artic
     // 2. Fetch all comments from all articles in a SINGLE Collection Group query
     const commentsGroupRef = collectionGroup(db, 'comments');
     const q = query(commentsGroupRef, orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
+    const snapshot = await withTimeout(getDocs(q));
 
     const commentsList: (Comment & { articleTitle?: string })[] = snapshot.docs.map(doc => {
       const commentData = doc.data() as Comment;
@@ -868,7 +881,7 @@ export async function getNewsletterSubscribers(): Promise<NewsletterSubscription
 
   try {
     const colRef = collection(db, 'newsletter');
-    const snapshot = await getDocs(query(colRef, orderBy('subscribedAt', 'desc')));
+    const snapshot = await withTimeout(getDocs(query(colRef, orderBy('subscribedAt', 'desc'))));
     const list = snapshot.docs.map(doc => doc.data() as NewsletterSubscription);
     LocalDbFallback.saveNewsletter(list);
     return list;
@@ -891,7 +904,7 @@ export async function getActiveAds(): Promise<AdPlacement[]> {
   try {
     const colRef = collection(db, path);
     const q = query(colRef, where('active', '==', true));
-    const snapshot = await getDocs(q);
+    const snapshot = await withTimeout(getDocs(q));
     if (snapshot.empty) return SEED_ADS.filter(ad => ad.active);
     const ads = snapshot.docs.map(doc => doc.data() as AdPlacement);
     LocalDbFallback.saveAds(ads);
@@ -912,7 +925,7 @@ export async function getAllAds(): Promise<AdPlacement[]> {
 
   try {
     const colRef = collection(db, path);
-    const snapshot = await getDocs(colRef);
+    const snapshot = await withTimeout(getDocs(colRef));
     const ads = snapshot.docs.map(doc => doc.data() as AdPlacement);
     LocalDbFallback.saveAds(ads);
     return ads;
@@ -1050,7 +1063,7 @@ export async function getAllAuthors(): Promise<Author[]> {
 
   try {
     const colRef = collection(db, path);
-    const snapshot = await getDocs(colRef);
+    const snapshot = await withTimeout(getDocs(colRef));
     const list = snapshot.docs.map(doc => doc.data() as Author);
     LocalDbFallback.saveAuthors(list);
     return list;
@@ -1071,7 +1084,7 @@ export async function getAuthorById(authorId: string): Promise<Author | null> {
 
   try {
     const docRef = doc(db, 'authors', authorId);
-    const snapshot = await getDoc(docRef);
+    const snapshot = await withTimeout(getDoc(docRef));
     if (!snapshot.exists()) {
       const list = LocalDbFallback.getAuthors();
       return list.find(a => a.id === authorId) || null;

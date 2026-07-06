@@ -206,10 +206,82 @@ export default function App() {
   const [lastFetchTime, setLastFetchTime] = useState<number>(getLastArticlesFetchTime());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Memo Cache Ref for rapid navigation
+  const memoCacheRef = useRef<{
+    articles: { data: Article[]; timestamp: number } | null;
+    categories: Record<string, { data: Article[]; timestamp: number }>;
+  }>({
+    articles: null,
+    categories: {}
+  });
+
+  // Concurrent promise-level deduplication to prevent overlapping redundant network calls
+  const activePrimaryLoadRef = useRef<Promise<void> | null>(null);
+  const activeCategoryLoadsRef = useRef<Record<string, Promise<Article[]>>>({});
+
+  const currentRoutingPathRef = useRef<string>('');
+
+  const getArticlesByCategoryMemoized = async (category: string, forceRefresh = false): Promise<Article[]> => {
+    const CACHE_TTL = 10000; // 10 seconds in-memory cache
+    const now = Date.now();
+    const catKey = category.toLowerCase();
+
+    if (!forceRefresh && memoCacheRef.current.categories[catKey] && (now - memoCacheRef.current.categories[catKey].timestamp < CACHE_TTL)) {
+      console.log(`[Memo Cache Hit] getArticlesByCategory served from in-memory cache for ${category}`);
+      return memoCacheRef.current.categories[catKey].data;
+    }
+
+    // Check if there is already an active load for this category
+    if (activeCategoryLoadsRef.current[catKey]) {
+      console.log(`[Memo Concurrent Hit] Re-using active loading promise for category ${category}`);
+      return activeCategoryLoadsRef.current[catKey];
+    }
+
+    const loadPromise = (async () => {
+      try {
+        const items = await getArticlesByCategory(category, forceRefresh);
+        memoCacheRef.current.categories[catKey] = {
+          data: items,
+          timestamp: Date.now()
+        };
+        return items;
+      } finally {
+        // Clear active promise when finished
+        delete activeCategoryLoadsRef.current[catKey];
+      }
+    })();
+
+    activeCategoryLoadsRef.current[catKey] = loadPromise;
+    return loadPromise;
+  };
+
   // Saved articles state
   const [savedSlugs, setSavedSlugs] = useState<string[]>([]);
   const [currentUserAuthor, setCurrentUserAuthor] = useState<any>(null);
   const [allArticles, setAllArticles] = useState<Article[]>([]);
+  const [readingProgress, setReadingProgress] = useState(0);
+
+  useEffect(() => {
+    if (!selectedArticle) {
+      setReadingProgress(0);
+      return;
+    }
+
+    const handleScroll = () => {
+      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (totalHeight > 0) {
+        const progress = (window.scrollY / totalHeight) * 100;
+        setReadingProgress(progress);
+      } else {
+        setReadingProgress(0);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [selectedArticle, currentPath]);
 
   useEffect(() => {
     getAllArticles().then(setAllArticles);
@@ -601,6 +673,7 @@ export default function App() {
   }, [authChecked, currentPath, navigate]);
 
   const handleRouting = async (path: string) => {
+    currentRoutingPathRef.current = path;
     setLoading(true);
     
     // Clear sub states
@@ -621,13 +694,16 @@ export default function App() {
 
     if (path === '/') {
       await loadPrimaryContent();
+      if (currentRoutingPathRef.current !== path) return;
     } else if (path.startsWith('/category/')) {
       const catId = path.split('/category/')[1];
-      const items = await getArticlesByCategory(catId);
+      const items = await getArticlesByCategoryMemoized(catId);
+      if (currentRoutingPathRef.current !== path) return;
       setCategoryArticles(items);
     } else if (path.startsWith('/article/')) {
       const slug = path.split('/article/')[1];
       const found = await getArticleBySlug(slug);
+      if (currentRoutingPathRef.current !== path) return;
       if (found) {
         setSelectedArticle(found);
         // Log view counter incrementally
@@ -638,43 +714,88 @@ export default function App() {
     } else if (path.startsWith('/search')) {
       const params = new URLSearchParams(window.location.search);
       const queryParam = params.get('q') || '';
+      if (currentRoutingPathRef.current !== path) return;
       setSearchQuery(queryParam);
     } else if (path === '/saved') {
       await loadPrimaryContent();
+      if (currentRoutingPathRef.current !== path) return;
     } else if (path.startsWith('/info/')) {
       const pageId = path.split('/info/')[1] as any;
+      if (currentRoutingPathRef.current !== path) return;
       if (['about', 'contact', 'privacy', 'terms', 'editorial', 'fact-check', 'cookie'].includes(pageId)) {
         setInfoTab(pageId);
       } else {
         setInfoTab('about');
       }
     }
-    setLoading(false);
+    
+    if (currentRoutingPathRef.current === path) {
+      setLoading(false);
+    }
   };
 
   const loadPrimaryContent = async (forceRefresh = false) => {
-    try {
-      await publishDueScheduledArticles();
-      const items = await getAllArticles(false, forceRefresh);
-      setArticles(items);
-      // Popular posts based on views
-      const popular = [...items].sort((a, b) => (b.views || 0) - (a.views || 0));
+    const CACHE_TTL = 10000; // 10 seconds memory cache for rapid navigation
+    const now = Date.now();
+    
+    if (!forceRefresh && memoCacheRef.current.articles && (now - memoCacheRef.current.articles.timestamp < CACHE_TTL)) {
+      console.log("[Memo Cache Hit] loadPrimaryContent served from in-memory cache");
+      const cachedItems = memoCacheRef.current.articles.data;
+      setArticles(cachedItems);
+      const popular = [...cachedItems].sort((a, b) => (b.views || 0) - (a.views || 0));
       setPopularArticles(popular);
       setLastFetchTime(getLastArticlesFetchTime());
-    } catch (err) {
-      console.error(err);
+      return;
     }
+
+    if (activePrimaryLoadRef.current) {
+      console.log("[Memo Concurrent Hit] Re-using active loading promise for primary content");
+      return activePrimaryLoadRef.current;
+    }
+
+    const loadPromise = (async () => {
+      try {
+        await publishDueScheduledArticles();
+        const items = await getAllArticles(false, forceRefresh);
+        
+        memoCacheRef.current.articles = {
+          data: items,
+          timestamp: Date.now()
+        };
+
+        setArticles(items);
+        // Popular posts based on views
+        const popular = [...items].sort((a, b) => (b.views || 0) - (a.views || 0));
+        setPopularArticles(popular);
+        setLastFetchTime(getLastArticlesFetchTime());
+      } catch (err) {
+        console.error(err);
+      } finally {
+        activePrimaryLoadRef.current = null;
+      }
+    })();
+
+    activePrimaryLoadRef.current = loadPromise;
+    return loadPromise;
+  };
+
+  const clearMemoCache = () => {
+    memoCacheRef.current = {
+      articles: null,
+      categories: {}
+    };
   };
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
     resetFirestoreFallback();
+    clearMemoCache();
     try {
       await loadPrimaryContent(true);
       // Also update current category articles if we are on a category page
       if (currentPath.startsWith('/category/')) {
         const catId = currentPath.split('/category/')[1];
-        const items = await getArticlesByCategory(catId, true);
+        const items = await getArticlesByCategoryMemoized(catId, true);
         setCategoryArticles(items);
       } else if (currentPath.startsWith('/article/')) {
         const slug = currentPath.split('/article/')[1];
@@ -704,11 +825,12 @@ export default function App() {
     setIsRefreshing(true);
     resetFirestoreFallback();
     setUsingFallback(false);
+    clearMemoCache();
     try {
       await loadPrimaryContent(true);
       if (currentPath.startsWith('/category/')) {
         const catId = currentPath.split('/category/')[1];
-        const items = await getArticlesByCategory(catId, true);
+        const items = await getArticlesByCategoryMemoized(catId, true);
         setCategoryArticles(items);
       } else if (currentPath.startsWith('/article/')) {
         const slug = currentPath.split('/article/')[1];
@@ -876,6 +998,14 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-950 dark:text-gray-100 flex flex-col font-sans transition-colors duration-200">
       
+      {/* Sticky Reading Progress Bar */}
+      {selectedArticle && currentPath.startsWith('/article/') && (
+        <div 
+          className="fixed top-0 left-0 h-1 bg-emerald-600 z-[10000] transition-all duration-100 ease-out shadow-[0_1px_10px_rgba(16,185,129,0.5)]" 
+          style={{ width: `${readingProgress}%` }}
+        />
+      )}
+
       {/* Header and Breaking News ticker */}
       <Header 
         currentPath={currentPath}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getOptimizedImageUrl } from '../lib/imageUtils';
+import { getOptimizedImageUrl, generateSrcSet } from '../lib/imageUtils';
 import { Maximize2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface NewsImageProps {
@@ -27,6 +27,9 @@ export default function NewsImage({
   const displaySrc = getOptimizedImageUrl(src, { width: 1200, quality: 85 }) || null;
   const zoomSrc = getOptimizedImageUrl(src, { width: 2000, quality: 90 }) || null;
 
+  // Generate responsive srcset structure for Unsplash images
+  const responsive = generateSrcSet(src);
+
   return (
     <div className={`space-y-2 ${className}`} id={`news-image-container-${Math.random().toString(36).substr(2, 9)}`}>
       {/* Primary Image Display Box */}
@@ -39,6 +42,8 @@ export default function NewsImage({
             src={blurSrc}
             alt=""
             aria-hidden="true"
+            loading="lazy"
+            decoding="async"
             className="absolute inset-0 w-full h-full object-cover filter blur-2xl scale-110 opacity-40 dark:opacity-20 pointer-events-none select-none z-0"
           />
         )}
@@ -46,10 +51,14 @@ export default function NewsImage({
         {/* 2. Main High-resolution Image - Centered and set to contain so it never crops */}
         {displaySrc && (
           <img
-            src={displaySrc}
+            src={responsive.src || displaySrc}
+            srcSet={responsive.srcSet || undefined}
+            sizes={responsive.sizes || undefined}
             alt={alt}
             referrerPolicy="no-referrer"
             onLoad={() => setImageLoaded(true)}
+            loading="lazy"
+            decoding="async"
             className={`relative w-full h-full object-contain z-10 transition-all duration-500 ${
               imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
             }`}
@@ -109,6 +118,8 @@ export default function NewsImage({
                 src={zoomSrc}
                 alt={alt}
                 referrerPolicy="no-referrer"
+                loading="lazy"
+                decoding="async"
                 className="max-w-full max-h-full object-contain rounded-xl shadow-2xl border border-white/10"
               />
             )}

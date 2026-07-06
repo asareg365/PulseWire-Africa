@@ -111,26 +111,50 @@ async function startServer() {
     });
   }
 
-  // Resilient content generation with retries for transient errors
-  async function generateContentWithRetry(ai: any, params: any, retries = 3, delay = 1000): Promise<any> {
+  // Resilient content generation with retries and self-healing fallback models for transient errors
+  async function generateContentWithRetry(ai: any, params: any, retries = 4, delay = 1000, attemptedFallbacks = 0): Promise<any> {
+    const currentModel = params.model || 'gemini-3.5-flash';
     try {
       return await ai.models.generateContent(params);
     } catch (err: any) {
-      // Hard quota errors shouldn't be retried as they represent an exceeded limit
-      const isQuotaExceeded = err.message?.includes('429') || 
-                             err.message?.includes('Resource has been exhausted') ||
-                             err.message?.includes('quota') ||
-                             err.message?.includes('RESOURCE_EXHAUSTED') ||
-                             err.status === 429;
+      const errMsg = err.message || '';
+      const errStatus = err.status;
 
-      const isTransient = (err.message?.includes('503') || 
-                           err.message?.includes('UNAVAILABLE') || 
-                           err.status === 503) && !isQuotaExceeded;
+      // Hard quota errors shouldn't be retried as they represent an exceeded limit
+      const isQuotaExceeded = errMsg.includes('429') || 
+                             errMsg.includes('Resource has been exhausted') ||
+                             errMsg.includes('quota') ||
+                             errMsg.includes('RESOURCE_EXHAUSTED') ||
+                             errStatus === 429;
+
+      const isTransient = (errMsg.includes('503') || 
+                           errMsg.includes('UNAVAILABLE') || 
+                           errMsg.includes('high demand') ||
+                           errMsg.includes('temporary') ||
+                           errStatus === 503) && !isQuotaExceeded;
+
+      // If it's a transient 503 or high-demand error and we haven't tried fallback models too many times,
+      // let's try a fallback model alias to self-heal!
+      if (isTransient && attemptedFallbacks < 2) {
+        let nextModel = 'gemini-flash-latest';
+        if (currentModel === 'gemini-flash-latest') {
+          nextModel = 'gemini-3.1-flash-lite';
+        } else if (currentModel === 'gemini-3.1-flash-lite') {
+          nextModel = 'gemini-3.5-flash'; // Avoid infinite loops
+        }
+        
+        console.warn(`[Self-Healing] Primary model (${currentModel}) is unavailable or experiencing high demand. Swapping to fallback model (${nextModel})...`);
+        const updatedParams = { ...params, model: nextModel };
+        // Try with the fallback model, keeping the same retry budget but incrementing attemptedFallbacks
+        return generateContentWithRetry(ai, updatedParams, retries, delay, attemptedFallbacks + 1);
+      }
 
       if (isTransient && retries > 0) {
-        console.warn(`Gemini API returned transient error. Retrying in ${delay}ms... (Retries left: ${retries})`, err.message);
+        const jitter = Math.floor(Math.random() * 500);
+        const nextDelay = delay * 2 + jitter;
+        console.warn(`Gemini API returned transient error on ${currentModel}. Retrying in ${delay}ms... (Retries left: ${retries})`, errMsg);
         await new Promise(resolve => setTimeout(resolve, delay));
-        return generateContentWithRetry(ai, params, retries - 1, delay * 2);
+        return generateContentWithRetry(ai, params, retries - 1, nextDelay, attemptedFallbacks);
       }
       throw err;
     }
@@ -889,15 +913,169 @@ Output must be a valid JSON object matching this schema:
     }
   });
 
+  // --- Dynamic Google News Sitemap ---
+  app.get('/news-sitemap.xml', async (req, res) => {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.get('host');
+    const appUrl = `${protocol}://${host}`;
+    
+    try {
+      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/pulsewireafrica/databases/ai-studio-pulsewireafrica-ce7cc083-15ac-489c-b8ff-506dc3277285/documents/articles?pageSize=100`;
+      const response = await fetch(firestoreUrl);
+      let newsArticles: any[] = [];
+      
+      if (response.ok) {
+        const data: any = await response.json();
+        if (data && data.documents) {
+          // Fetch articles published in the last 48 hours (or fall back to the last 20 latest publications)
+          const allDocs = data.documents.filter((doc: any) => {
+            return doc.fields && doc.fields.status?.stringValue === 'published';
+          }).map((doc: any) => {
+            const fields = doc.fields;
+            return {
+              title: fields.title?.stringValue || 'PulseWire Africa Story',
+              slug: fields.slug?.stringValue,
+              publishedAt: fields.publishedAt?.stringValue || fields.createdAt?.stringValue || new Date().toISOString()
+            };
+          });
+          
+          const fortyEightHoursAgo = Date.now() - (48 * 60 * 60 * 1000);
+          newsArticles = allDocs.filter((art: any) => {
+            const pubTime = new Date(art.publishedAt).getTime();
+            return pubTime >= fortyEightHoursAgo;
+          });
+          
+          // Fallback if no publications in last 48 hours (so sitemap remains seeded)
+          if (newsArticles.length === 0) {
+            newsArticles = allDocs.slice(0, 20);
+          }
+        }
+      }
+
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
+`;
+
+      newsArticles.forEach(art => {
+        if (art.slug) {
+          // Escape XML special characters
+          const escapedTitle = art.title
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+
+          xml += `  <url>
+    <loc>${appUrl}/article/${art.slug}</loc>
+    <news:news>
+      <news:publication>
+        <news:name>PulseWire Africa</news:name>
+        <news:language>en</news:language>
+      </news:publication>
+      <news:publication_date>${art.publishedAt}</news:publication_date>
+      <news:title>${escapedTitle}</news:title>
+    </news:news>
+  </url>
+`;
+        }
+      });
+
+      xml += `</urlset>`;
+
+      res.setHeader('Content-Type', 'application/xml');
+      res.send(xml);
+    } catch (err) {
+      console.error('News sitemap generation error:', err);
+      res.status(500).send('Error generating news sitemap');
+    }
+  });
+
+  // --- Dynamic RSS 2.0 Feed ---
+  app.get('/rss.xml', async (req, res) => {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.get('host');
+    const appUrl = `${protocol}://${host}`;
+    
+    try {
+      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/pulsewireafrica/databases/ai-studio-pulsewireafrica-ce7cc083-15ac-489c-b8ff-506dc3277285/documents/articles?pageSize=30`;
+      const response = await fetch(firestoreUrl);
+      let rssItems: any[] = [];
+      
+      if (response.ok) {
+        const data: any = await response.json();
+        if (data && data.documents) {
+          rssItems = data.documents.filter((doc: any) => {
+            return doc.fields && doc.fields.status?.stringValue === 'published';
+          }).map((doc: any) => {
+            const fields = doc.fields;
+            return {
+              title: fields.title?.stringValue || 'PulseWire Africa Story',
+              summary: fields.summary?.stringValue || '',
+              slug: fields.slug?.stringValue,
+              category: fields.category?.stringValue || 'News',
+              authorName: fields.authorName?.stringValue || 'PulseWire Reporter',
+              publishedAt: fields.publishedAt?.stringValue || fields.createdAt?.stringValue || new Date().toISOString()
+            };
+          });
+        }
+      }
+
+      let rss = `<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel>
+  <title>PulseWire Africa | Premium News &amp; Commentary</title>
+  <link>${appUrl}</link>
+  <description>Modern, professional, SEO-optimized news coverage of Ghana, Africa, and world events.</description>
+  <language>en-us</language>
+  <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
+  <atom:link href="${appUrl}/rss.xml" rel="self" type="application/rss+xml" />
+`;
+
+      rssItems.forEach(item => {
+        if (item.slug) {
+          const escapedTitle = item.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          const escapedSummary = item.summary.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          const pubDate = new Date(item.publishedAt).toUTCString();
+
+          rss += `  <item>
+    <title>${escapedTitle}</title>
+    <link>${appUrl}/article/${item.slug}</link>
+    <guid isPermaLink="true">${appUrl}/article/${item.slug}</guid>
+    <pubDate>${pubDate}</pubDate>
+    <description>${escapedSummary}</description>
+    <category>${item.category}</category>
+    <dc:creator>${item.authorName}</dc:creator>
+  </item>
+`;
+        }
+      });
+
+      rss += `</channel>
+</rss>`;
+
+      res.setHeader('Content-Type', 'application/xml');
+      res.send(rss);
+    } catch (err) {
+      console.error('RSS feed generation error:', err);
+      res.status(500).send('Error generating RSS feed');
+    }
+  });
+
   // --- Dynamic Robots.txt ---
   app.get('/robots.txt', (req, res) => {
-    const appUrl = process.env.APP_URL || 'https://pulsewireafrica-152570020464.us-central1.run.app';
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.get('host');
+    const appUrl = `${protocol}://${host}`;
+    
     const content = `User-agent: *
 Allow: /
 Disallow: /admin
 Disallow: /api/
 
 Sitemap: ${appUrl}/sitemap.xml
+Sitemap: ${appUrl}/news-sitemap.xml
 `;
     res.setHeader('Content-Type', 'text/plain');
     res.send(content);
