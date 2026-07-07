@@ -171,47 +171,29 @@ let isFirestoreUnavailable = false;
 
 // Determine if we should bypass Firestore and run purely locally
 function shouldBypassFirestore(): boolean {
-  if (isFirestoreUnavailable) return true;
-  try {
-    if (sessionStorage.getItem('pulsewire_use_local_db') === 'true') {
-      isFirestoreUnavailable = true;
-      return true;
-    }
-  } catch (e) {}
-  return false;
+  return isFirestoreUnavailable;
 }
 
 // Mark Firestore as unavailable and activate fallback mode
 function flagFirestoreUnavailable(error: any) {
   console.warn("PulseWire Africa is switching to Local Offline Fallback Mode. Error detail:", error);
   isFirestoreUnavailable = true;
-  try {
-    sessionStorage.setItem('pulsewire_use_local_db', 'true');
-  } catch (e) {}
 }
 
 export function isUsingLocalFallback(): boolean {
-  if (isFirestoreUnavailable) return true;
-  try {
-    return sessionStorage.getItem('pulsewire_use_local_db') === 'true';
-  } catch (e) {
-    return false;
-  }
+  return isFirestoreUnavailable;
 }
 
 export function resetFirestoreFallback() {
   isFirestoreUnavailable = false;
-  try {
-    sessionStorage.removeItem('pulsewire_use_local_db');
-  } catch (e) {}
 }
 
 // Resilient promise timeout helper to prevent hanging queries on slow connections
-async function withTimeout<T>(promise: Promise<T>, timeoutMs = 2500): Promise<T> {
+async function withTimeout<T>(promise: Promise<T>, timeoutMs = 10000): Promise<T> {
   let timeoutId: any;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
-      reject(new Error("Firestore operation timed out"));
+      reject(new Error("Firestore operation timed out after " + timeoutMs + "ms. Connection may be cold starting or slow."));
     }, timeoutMs);
   });
   return Promise.race([promise, timeoutPromise]).finally(() => {
