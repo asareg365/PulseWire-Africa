@@ -99,6 +99,7 @@ export default function App() {
   const [authName, setAuthName] = useState('');
   const [authRole, setAuthRole] = useState<'reader' | 'contributor' | 'editor'>('reader');
   const [authError, setAuthError] = useState('');
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [showForgotPasswordPrompt, setShowForgotPasswordPrompt] = useState(false);
   const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false);
@@ -290,43 +291,78 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (user) {
-        let author = await getAuthorById(user.uid);
-        if (!author) {
-          const isSuperAdmin = ['asareg365@gmail.com', 'pulsewireafrica@gmail.com'].map(e => e.toLowerCase()).includes(user.email?.trim().toLowerCase() || '');
-          const newAuthor: Author = {
-            id: user.uid,
-            name: user.displayName || user.email?.split('@')[0] || 'User',
-            email: user.email || '',
-            role: isSuperAdmin ? 'admin' : 'reader',
-            status: 'approved',
-            bio: '',
-            avatar: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}&background=f1f5f9&color=dc2626&bold=true&size=256`,
-            createdAt: new Date().toISOString(),
-          };
-          try {
-            await saveAuthor(newAuthor);
-            author = newAuthor;
-          } catch (e) {
-            console.error("Error auto-creating author profile:", e);
-          }
-        }
-        if (author) {
-          setCurrentUserAuthor(author);
-          setSavedSlugs(author.savedSlugs || []);
-          
-          // Sync isAdmin based on email for header shortcut immediately on load
-          const isSuperAdmin = ['asareg365@gmail.com', 'pulsewireafrica@gmail.com'].map(e => e.toLowerCase()).includes(user.email?.trim().toLowerCase() || '');
-          setIsAdmin(isSuperAdmin);
-        }
-      } else {
-        setCurrentUserAuthor(null);
-        setSavedSlugs([]);
-        setIsAdmin(false);
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      if (reason && reason.message && (reason.message.includes('auth/invalid-api-key') || reason.code === 'auth/invalid-api-key')) {
+        console.warn("Caught Firebase invalid API key error globally:", reason);
+        setApiKeyError("Firebase API Key is invalid or restricted (e.g. Website Referrer HTTP header blocked).");
+        event.preventDefault();
       }
-      setAuthChecked(true);
-    });
+    };
+
+    const handleGlobalError = (event: ErrorEvent) => {
+      if (event.error && (event.error.message?.includes('auth/invalid-api-key') || event.error.code === 'auth/invalid-api-key')) {
+        console.warn("Caught Firebase invalid API key error globally:", event.error);
+        setApiKeyError("Firebase API Key is invalid or restricted (e.g. Website Referrer HTTP header blocked).");
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    window.addEventListener('error', handleGlobalError);
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      window.removeEventListener('error', handleGlobalError);
+    };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(
+      async (user) => {
+        if (user) {
+          let author = await getAuthorById(user.uid);
+          if (!author) {
+            const isSuperAdmin = ['asareg365@gmail.com', 'pulsewireafrica@gmail.com'].map(e => e.toLowerCase()).includes(user.email?.trim().toLowerCase() || '');
+            const newAuthor: Author = {
+              id: user.uid,
+              name: user.displayName || user.email?.split('@')[0] || 'User',
+              email: user.email || '',
+              role: isSuperAdmin ? 'admin' : 'reader',
+              status: 'approved',
+              bio: '',
+              avatar: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'User')}&background=f1f5f9&color=dc2626&bold=true&size=256`,
+              createdAt: new Date().toISOString(),
+            };
+            try {
+              await saveAuthor(newAuthor);
+              author = newAuthor;
+            } catch (e) {
+              console.error("Error auto-creating author profile:", e);
+            }
+          }
+          if (author) {
+            setCurrentUserAuthor(author);
+            setSavedSlugs(author.savedSlugs || []);
+            
+            // Sync isAdmin based on email for header shortcut immediately on load
+            const isSuperAdmin = ['asareg365@gmail.com', 'pulsewireafrica@gmail.com'].map(e => e.toLowerCase()).includes(user.email?.trim().toLowerCase() || '');
+            setIsAdmin(isSuperAdmin);
+          }
+        } else {
+          setCurrentUserAuthor(null);
+          setSavedSlugs([]);
+          setIsAdmin(false);
+        }
+        setAuthChecked(true);
+      },
+      (error: any) => {
+        console.error("Firebase auth state change error:", error);
+        if (error.message?.includes('auth/invalid-api-key') || error.code === 'auth/invalid-api-key') {
+          setApiKeyError("Firebase API Key is invalid or restricted (e.g. Website Referrer HTTP header blocked).");
+        }
+        setAuthChecked(true);
+      }
+    );
     return unsubscribe;
   }, []);
 
@@ -1021,6 +1057,28 @@ export default function App() {
       />
       
       <BreakingTicker navigate={navigate} />
+
+      {/* Firebase API Key / Referrer Restriction warning banner */}
+      {apiKeyError && (
+        <div className="bg-gradient-to-r from-red-800 to-rose-900 text-white text-xs py-3 px-4 font-sans font-medium flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md border-b border-red-700">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-300 animate-pulse" />
+            <div className="space-y-1">
+              <span className="font-semibold block sm:inline">Firebase API Key / Restriction Issue Detected:</span>
+              <span className="text-rose-100 block sm:inline"> {apiKeyError}</span>
+              <div className="text-[10px] text-rose-200 mt-1 sm:mt-0 leading-relaxed font-normal">
+                If you are a developer, please visit your <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="underline font-medium hover:text-white">Google Cloud Console</a> &gt; APIs &amp; Services &gt; Credentials, and ensure the API key website restrictions allow your AI Studio preview domains (<code className="bg-black/30 px-1 py-0.5 rounded text-[9px] font-mono">*.europe-west1.run.app</code>) or set Website Restrictions to <strong>"None"</strong> for development.
+              </div>
+            </div>
+          </div>
+          <button 
+            onClick={() => setApiKeyError(null)}
+            className="bg-white/20 hover:bg-white/30 text-white font-semibold uppercase tracking-wider px-2.5 py-1 rounded text-[10px] shrink-0 transition-colors"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* AI Key configuration banner reminder */}
       {!aiConfigured && (
