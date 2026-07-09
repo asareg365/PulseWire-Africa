@@ -82,6 +82,27 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
   const [subscribers, setSubscribers] = useState<NewsletterSubscription[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Article pagination and search states
+  const [artSearchQuery, setArtSearchQuery] = useState('');
+  const [artStatusFilter, setArtStatusFilter] = useState('all');
+  const [artPage, setArtPage] = useState(1);
+  const [artPageSize] = useState(10);
+
+  // Filter and paginate articles for rendering
+  const filteredArticles = articles.filter(art => {
+    const matchesSearch = !artSearchQuery.trim() || 
+      (art.title || '').toLowerCase().includes(artSearchQuery.toLowerCase()) ||
+      (art.summary || '').toLowerCase().includes(artSearchQuery.toLowerCase()) ||
+      (art.slug || '').toLowerCase().includes(artSearchQuery.toLowerCase());
+    
+    const matchesStatus = artStatusFilter === 'all' || art.status === artStatusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const paginatedArticles = filteredArticles.slice((artPage - 1) * artPageSize, artPage * artPageSize);
+  const totalArtPages = Math.ceil(filteredArticles.length / artPageSize);
+
   const bureauAuthors = authors.filter(a => {
     const roleLower = (a.role || '').toLowerCase();
     return roleLower !== 'reader';
@@ -2314,6 +2335,39 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                 </button>
               </div>
 
+              {/* Search and Filter panel */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-gray-50 dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800">
+                <div className="relative w-full sm:max-w-xs">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search articles by title, slug..."
+                    value={artSearchQuery}
+                    onChange={e => {
+                      setArtSearchQuery(e.target.value);
+                      setArtPage(1); // reset to page 1 on search
+                    }}
+                    className="w-full pl-9 pr-4 py-2 border border-gray-200 dark:border-gray-800 rounded-lg text-xs bg-white dark:bg-gray-950 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-red-600 focus:border-red-600"
+                  />
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <span className="text-[11px] font-bold text-gray-400 uppercase font-mono">Status:</span>
+                  <select
+                    value={artStatusFilter}
+                    onChange={e => {
+                      setArtStatusFilter(e.target.value);
+                      setArtPage(1); // reset to page 1 on filter
+                    }}
+                    className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 rounded-lg text-xs bg-white dark:bg-gray-950 text-gray-900 dark:text-white font-mono uppercase font-bold focus:outline-none focus:ring-1 focus:ring-red-600"
+                  >
+                    <option value="all">ALL STORIES</option>
+                    <option value="published">PUBLISHED</option>
+                    <option value="draft">DRAFTS</option>
+                    <option value="scheduled">SCHEDULED</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="overflow-x-auto border border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-950">
                 <table className="w-full text-left border-collapse text-sm">
                   <thead>
@@ -2327,12 +2381,12 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                    {articles.length === 0 ? (
+                    {paginatedArticles.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="p-8 text-center text-gray-500 font-mono">No articles catalogued yet.</td>
+                        <td colSpan={6} className="p-8 text-center text-gray-500 font-mono">No matching articles found.</td>
                       </tr>
                     ) : (
-                      articles.map(art => (
+                      paginatedArticles.map(art => (
                         <tr key={art.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/10 transition-colors">
                           <td className="p-4 flex items-center gap-3">
                             <img src={art.featuredImage || null} alt="Cover" className="w-10 h-10 object-cover rounded border border-gray-200 dark:border-gray-800 shrink-0" />
@@ -2412,6 +2466,54 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination controls */}
+              {totalArtPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-100 dark:border-gray-900">
+                  <span className="text-xs text-gray-500 font-mono">
+                    Showing Page <strong className="text-gray-900 dark:text-white">{artPage}</strong> of <strong className="text-gray-900 dark:text-white">{totalArtPages}</strong> ({filteredArticles.length} matching articles)
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setArtPage(prev => Math.max(1, prev - 1))}
+                      disabled={artPage === 1}
+                      className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 rounded-lg text-xs font-bold uppercase tracking-wider font-mono bg-white dark:bg-gray-950 text-gray-700 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-900"
+                    >
+                      Prev
+                    </button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalArtPages }).map((_, i) => {
+                        const pageNum = i + 1;
+                        if (pageNum === 1 || pageNum === totalArtPages || Math.abs(pageNum - artPage) <= 1) {
+                          return (
+                            <button
+                              key={pageNum}
+                              onClick={() => setArtPage(pageNum)}
+                              className={`w-8 h-8 rounded-lg text-xs font-bold font-mono transition-colors ${
+                                artPage === pageNum
+                                  ? 'bg-red-600 text-white'
+                                  : 'border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        } else if (pageNum === 2 || pageNum === totalArtPages - 1) {
+                          return <span key={pageNum} className="text-xs text-gray-400 font-mono">...</span>;
+                        }
+                        return null;
+                      })}
+                    </div>
+                    <button
+                      onClick={() => setArtPage(prev => Math.min(totalArtPages, prev + 1))}
+                      disabled={artPage === totalArtPages}
+                      className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 rounded-lg text-xs font-bold uppercase tracking-wider font-mono bg-white dark:bg-gray-950 text-gray-700 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-900"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

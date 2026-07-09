@@ -614,14 +614,25 @@ export default function App() {
     initDB();
   }, []);
 
-  // Poll fallback status
+  // Poll fallback status and handle online reconnection
   useEffect(() => {
     const checkFallback = () => {
       setUsingFallback(isUsingLocalFallback());
     };
     checkFallback();
     const interval = setInterval(checkFallback, 2000);
-    return () => clearInterval(interval);
+
+    const handleOnline = () => {
+      console.log("[Network Status] Internet connection detected. Attempting to reconnect live DB...");
+      handleReconnect();
+    };
+
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('online', handleOnline);
+    };
   }, []);
 
   // Theme Syncing
@@ -1100,11 +1111,11 @@ export default function App() {
 
       {/* Firestore fallback reminder banner */}
       {usingFallback && (
-        <div className="bg-amber-600 text-white text-xs py-2.5 px-4 font-sans font-medium flex items-center justify-between shadow-md">
+        <div className="bg-amber-600 text-white text-xs py-2.5 px-4 font-sans font-medium flex items-center justify-between shadow-md" id="offline-fallback-banner">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0 animate-pulse text-white" />
             <span>
-              <strong>Running in Local-only Demo Mode:</strong> The Firestore database daily free-tier read/write limit is currently exceeded. PulseWire Africa has automatically enabled <strong>Local Offline Fallback (localStorage)</strong> to keep all articles, comments, newsletters, and dashboards fully responsive and functional!
+              <strong>Offline Mode</strong> — displaying the latest available news while checking for updates.
             </span>
           </div>
           <div className="flex items-center gap-2 shrink-0">

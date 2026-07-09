@@ -82,7 +82,26 @@ class LocalDbFallback {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (err) {
-      console.error('Failed to write to localStorage fallback:', err);
+      if (err instanceof DOMException && (
+          err.name === 'QuotaExceededError' ||
+          err.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
+        console.warn('localStorage quota exceeded. Retrying with ultra-minimal fallback data...');
+        try {
+          if (key === 'pulsewire_fallback_articles' && Array.isArray(value)) {
+            const pruned = value.slice(0, 5).map(art => ({
+              ...art,
+              content: art.content ? art.content.slice(0, 300) + '... [Truncated due to storage limits]' : ''
+            }));
+            localStorage.setItem(key, JSON.stringify(pruned));
+          } else {
+            localStorage.removeItem(key);
+          }
+        } catch (innerErr) {
+          console.warn('Failed to save even pruned data to localStorage:', innerErr);
+        }
+      } else {
+        console.warn('Failed to write to localStorage fallback:', err);
+      }
     }
   }
 
@@ -91,7 +110,15 @@ class LocalDbFallback {
   }
 
   static saveArticles(articles: Article[]) {
-    this.set('pulsewire_fallback_articles', articles);
+    // Proactively limit count and content size to prevent exceeding the browser localStorage quota
+    const optimized = articles.slice(0, 15).map(art => ({
+      ...art,
+      content: art.content && art.content.length > 2000 
+        ? art.content.slice(0, 2000) + '... [Truncated for offline storage]' 
+        : art.content,
+      images: art.images ? art.images.filter(img => !img.startsWith('data:image')) : []
+    }));
+    this.set('pulsewire_fallback_articles', optimized);
   }
 
   static getComments(): Comment[] {
@@ -376,6 +403,120 @@ export async function clearAllDatabaseData(): Promise<void> {
   }
 }
 
+
+// ---------------- Smart Multi-Layer Caching Layer ----------------
+export class SmartCache {
+  private static inMemory = new Map<string, { data: any; timestamp: number }>();
+
+  static get<T>(key: string, ttlMs: number, type: 'memory' | 'session' | 'local' = 'memory'): T | null {
+    const now = Date.now();
+
+    // 1. Check In-Memory Cache (L1)
+    const memEntry = this.inMemory.get(key);
+    if (memEntry && now - memEntry.timestamp < ttlMs) {
+      return memEntry.data as T;
+    }
+
+    // 2. Check SessionStorage Cache (L2)
+    if (type === 'session' || type === 'local') {
+      try {
+        const sessionData = sessionStorage.getItem(key);
+        if (sessionData) {
+          const entry = JSON.parse(sessionData);
+          if (now - entry.timestamp < ttlMs) {
+            // Repopulate L1 cache for subsequent rapid access
+            this.inMemory.set(key, { data: entry.data, timestamp: entry.timestamp });
+            return entry.data as T;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 3. Check LocalStorage Cache (L3)
+    if (type === 'local') {
+      try {
+        const localData = localStorage.getItem(key);
+        if (localData) {
+          const entry = JSON.parse(localData);
+          if (now - entry.timestamp < ttlMs) {
+            // Repopulate L1 cache for subsequent rapid access
+            this.inMemory.set(key, { data: entry.data, timestamp: entry.timestamp });
+            return entry.data as T;
+          }
+        }
+      } catch (e) {}
+    }
+
+    return null;
+  }
+
+  static set<T>(key: string, data: T, type: 'memory' | 'session' | 'local' = 'local'): void {
+    const timestamp = Date.now();
+
+    // Always set L1
+    this.inMemory.set(key, { data, timestamp });
+
+    // Set L2
+    if (type === 'session' || type === 'local') {
+      try {
+        sessionStorage.setItem(key, JSON.stringify({ data, timestamp }));
+      } catch (e) {}
+    }
+
+    // Set L3
+    if (type === 'local') {
+      try {
+        localStorage.setItem(key, JSON.stringify({ data, timestamp }));
+      } catch (e) {}
+    }
+  }
+
+  static invalidate(pattern: string): void {
+    console.log(`[SmartCache Invalidate] Invalidating keys matching pattern: ${pattern}`);
+    
+    // 1. Clear In-Memory
+    for (const key of this.inMemory.keys()) {
+      if (key.includes(pattern)) {
+        this.inMemory.delete(key);
+      }
+    }
+
+    // 2. Clear SessionStorage
+    try {
+      const sessionKeys = Object.keys(sessionStorage);
+      for (const key of sessionKeys) {
+        if (key.includes(pattern)) {
+          sessionStorage.removeItem(key);
+        }
+      }
+    } catch (e) {}
+
+    // 3. Clear LocalStorage
+    try {
+      const localKeys = Object.keys(localStorage);
+      for (const key of localKeys) {
+        if (key.includes(pattern)) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch (e) {}
+  }
+
+  static clearAll(): void {
+    this.inMemory.clear();
+    try {
+      sessionStorage.clear();
+      // Remove only app-specific localStorage keys
+      const localKeys = Object.keys(localStorage);
+      for (const key of localKeys) {
+        if (key.startsWith('articles_') || key.startsWith('article_') || key.startsWith('comments_') || key.startsWith('active_ads') || key.startsWith('all_authors')) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch (e) {}
+  }
+}
+
 // ---------------- Articles ----------------
 
 const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes cache duration
@@ -396,42 +537,58 @@ export function getArticlesCacheDuration(): number {
 
 // Fetch all articles
 export async function getAllArticles(includeDrafts = false, forceRefresh = false): Promise<Article[]> {
-  const path = 'articles';
-  let docs: Article[] = [];
-
-  const lastFetchTime = getLastArticlesFetchTime();
-  const isCacheValid = lastFetchTime && (Date.now() - lastFetchTime < CACHE_DURATION_MS);
+  const cacheKey = includeDrafts ? 'articles_all_with_drafts' : 'articles_all_published';
+  const ttl = 10 * 60 * 1000; // 10 minutes
 
   if (shouldBypassFirestore()) {
-    docs = LocalDbFallback.getArticles();
-  } else if (!forceRefresh && isCacheValid) {
-    console.log(`[Cache Hit] Serving articles from local cache. Age: ${Math.round((Date.now() - lastFetchTime) / 1000)}s`);
-    docs = LocalDbFallback.getArticles();
-  } else {
-    try {
-      console.log(`[Cache Miss/Force] Fetching articles directly from Firestore...`);
-      const colRef = collection(db, path);
-      const q = query(colRef, orderBy('createdAt', 'desc'));
-      const snapshot = await withTimeout(getDocs(q));
-      docs = snapshot.docs.map(doc => doc.data() as Article);
-      
-      // Update local storage cache and timestamp
-      if (docs.length > 0) {
-        LocalDbFallback.saveArticles(docs);
-        try {
-          localStorage.setItem(ARTICLE_TIMESTAMP_KEY, Date.now().toString());
-        } catch (e) {}
-      }
-    } catch (error) {
-      flagFirestoreUnavailable(error);
-      docs = LocalDbFallback.getArticles();
+    return LocalDbFallback.getArticles().filter(art => includeDrafts || art.status === 'published');
+  }
+
+  if (!forceRefresh) {
+    const cached = SmartCache.get<Article[]>(cacheKey, ttl, 'local');
+    if (cached) {
+      console.log(`[SmartCache Hit] Serving full articles list from L1/L3 cache.`);
+      return cached;
     }
   }
-  
-  if (includeDrafts) {
-    return docs;
-  } else {
-    return docs.filter(art => art.status === 'published');
+
+  try {
+    console.log(`[SmartCache Miss] Fetching full articles from REST API /api/articles...`);
+    const response = await fetch(`/api/articles?limit=300`);
+    if (!response.ok) {
+      throw new Error(`REST API returned ${response.status}`);
+    }
+    const resData = await response.json();
+    const articles = resData.articles as Article[];
+
+    // Filter or keep drafts depending on parameters
+    const filtered = articles.filter(art => includeDrafts || art.status === 'published');
+
+    SmartCache.set(cacheKey, filtered, 'local');
+    LocalDbFallback.saveArticles(articles);
+    try {
+      localStorage.setItem(ARTICLE_TIMESTAMP_KEY, Date.now().toString());
+    } catch (e) {}
+
+    return filtered;
+  } catch (err) {
+    console.warn('REST API full fetch failed, falling back to direct query or local fallback:', err);
+    try {
+      const colRef = collection(db, 'articles');
+      const q = query(colRef, orderBy('createdAt', 'desc'));
+      const snapshot = await withTimeout(getDocs(q));
+      const articles = snapshot.docs.map(doc => doc.data() as Article);
+
+      const filtered = articles.filter(art => includeDrafts || art.status === 'published');
+
+      SmartCache.set(cacheKey, filtered, 'local');
+      LocalDbFallback.saveArticles(articles);
+
+      return filtered;
+    } catch (fsErr) {
+      flagFirestoreUnavailable(fsErr);
+      return LocalDbFallback.getArticles().filter(art => includeDrafts || art.status === 'published');
+    }
   }
 }
 
@@ -462,49 +619,53 @@ export async function publishDueScheduledArticles(): Promise<number> {
 
 // Fetch articles by category
 export async function getArticlesByCategory(category: string, forceRefresh = false): Promise<Article[]> {
-  const path = 'articles';
-  let list: Article[] = [];
-
-  const lastFetchTime = getLastArticlesFetchTime();
-  const isCacheValid = lastFetchTime && (Date.now() - lastFetchTime < CACHE_DURATION_MS);
+  const cacheKey = `articles_category_${category.toLowerCase()}`;
+  const ttl = 10 * 60 * 1000; // 10 minutes
 
   if (shouldBypassFirestore()) {
-    list = LocalDbFallback.getArticles();
-  } else if (!forceRefresh && isCacheValid) {
-    console.log(`[Cache Hit] Serving category articles from local cache.`);
-    list = LocalDbFallback.getArticles();
-  } else {
-    try {
-      console.log(`[Cache Miss/Force] Fetching articles for category from Firestore...`);
-      const colRef = collection(db, path);
-      const q = query(colRef, orderBy('createdAt', 'desc'));
-      const snapshot = await withTimeout(getDocs(q));
-      list = snapshot.docs.map(doc => doc.data() as Article);
-      if (list.length > 0) {
-        LocalDbFallback.saveArticles(list);
-        try {
-          localStorage.setItem(ARTICLE_TIMESTAMP_KEY, Date.now().toString());
-        } catch (e) {}
-      }
-    } catch (error) {
-      flagFirestoreUnavailable(error);
-      list = LocalDbFallback.getArticles();
+    const local = LocalDbFallback.getArticles().filter(art => art.status === 'published');
+    return local.filter(art => {
+      const cats = art.categories && art.categories.length > 0 ? art.categories : [art.category];
+      return cats.some(c => c.toLowerCase() === category.toLowerCase());
+    });
+  }
+
+  if (!forceRefresh) {
+    const cached = SmartCache.get<Article[]>(cacheKey, ttl, 'local');
+    if (cached) {
+      console.log(`[SmartCache Hit] Serving category articles from client cache: ${category}`);
+      return cached;
     }
   }
 
-  return list.filter(art => {
-    if (art.status !== 'published') return false;
-    const cats = art.categories && art.categories.length > 0 ? art.categories : [art.category];
-    return cats.some(c => c.toLowerCase() === category.toLowerCase());
-  });
+  try {
+    console.log(`[SmartCache Miss] Fetching category ${category} articles from REST API...`);
+    const response = await fetch(`/api/articles?category=${encodeURIComponent(category)}&limit=100`);
+    if (!response.ok) {
+      throw new Error(`REST API returned ${response.status}`);
+    }
+    const resData = await response.json();
+    const articles = resData.articles as Article[];
+
+    SmartCache.set(cacheKey, articles, 'local');
+    return articles;
+  } catch (err) {
+    console.warn('REST API category fetch failed, falling back to full list filter:', err);
+    const allArticles = await getAllArticles(false, false);
+    const filtered = allArticles.filter(art => {
+      const cats = art.categories && art.categories.length > 0 ? art.categories : [art.category];
+      return cats.some(c => c.toLowerCase() === category.toLowerCase());
+    });
+    SmartCache.set(cacheKey, filtered, 'local');
+    return filtered;
+  }
 }
 
 // Fetch single article by slug
 export async function getArticleBySlug(slug: string, forceRefresh = false): Promise<Article | null> {
-  const path = 'articles';
+  const cacheKey = `article_slug_${slug}`;
+  const ttl = 30 * 60 * 1000; // 30 minutes
 
-  const lastFetchTime = getLastArticlesFetchTime();
-  const isCacheValid = lastFetchTime && (Date.now() - lastFetchTime < CACHE_DURATION_MS);
   const local = LocalDbFallback.getArticles();
   const cachedArt = local.find(a => a.slug === slug);
 
@@ -512,34 +673,109 @@ export async function getArticleBySlug(slug: string, forceRefresh = false): Prom
     return cachedArt || null;
   }
 
-  if (!forceRefresh && isCacheValid && cachedArt) {
-    console.log(`[Cache Hit] Serving article details from local cache for slug: ${slug}`);
-    return cachedArt;
+  if (!forceRefresh) {
+    const cached = SmartCache.get<Article>(cacheKey, ttl, 'local');
+    if (cached) {
+      console.log(`[SmartCache Hit] Serving article details from cache for slug: ${slug}`);
+      return cached;
+    }
   }
 
   try {
-    console.log(`[Cache Miss/Force] Fetching article details from Firestore for slug: ${slug}`);
-    const colRef = collection(db, path);
+    console.log(`[SmartCache Miss] Fetching single article details via direct SDK query...`);
+    const colRef = collection(db, 'articles');
     const q = query(colRef, where('slug', '==', slug), limit(1));
     const snapshot = await withTimeout(getDocs(q));
+    
     if (snapshot.empty) {
       return cachedArt || null;
     }
+    
     const fetchedArt = snapshot.docs[0].data() as Article;
     
-    // Update local cache for this article
-    const index = local.findIndex(a => a.id === fetchedArt.id);
-    if (index !== -1) {
-      local[index] = fetchedArt;
+    if (!fetchedArt.id) {
+      fetchedArt.id = snapshot.docs[0].id;
+    }
+
+    SmartCache.set(cacheKey, fetchedArt, 'local');
+    
+    const idx = local.findIndex(a => a.id === fetchedArt.id);
+    if (idx !== -1) {
+      local[idx] = fetchedArt;
     } else {
       local.push(fetchedArt);
     }
     LocalDbFallback.saveArticles(local);
-    
+
     return fetchedArt;
-  } catch (error) {
-    flagFirestoreUnavailable(error);
+  } catch (err) {
+    console.warn('Firestore slug query failed, falling back to cached:', err);
+    flagFirestoreUnavailable(err);
     return cachedArt || null;
+  }
+}
+
+// Fetch articles with pagination (supports infinite scroll / Admin dashboard)
+export async function getArticlesPaginated(pageSize = 10, page = 1, category?: string): Promise<{ articles: Article[], totalCount: number, hasMore: boolean }> {
+  if (shouldBypassFirestore()) {
+    let list = LocalDbFallback.getArticles().filter(art => art.status === 'published');
+    if (category) {
+      list = list.filter(art => {
+        const cats = art.categories && art.categories.length > 0 ? art.categories : [art.category];
+        return cats.some(c => c.toLowerCase() === category.toLowerCase());
+      });
+    }
+    const startIndex = (page - 1) * pageSize;
+    const sliced = list.slice(startIndex, startIndex + pageSize);
+    return {
+      articles: sliced,
+      totalCount: list.length,
+      hasMore: startIndex + pageSize < list.length
+    };
+  }
+
+  const cacheKey = `articles_paginated_page_${page}_size_${pageSize}_cat_${category || 'all'}`;
+  const ttl = 10 * 60 * 1000; // 10 minutes
+
+  const cached = SmartCache.get<any>(cacheKey, ttl, 'local');
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const catParam = category ? `&category=${encodeURIComponent(category)}` : '';
+    const response = await fetch(`/api/articles?limit=${pageSize}&page=${page}${catParam}`);
+    if (!response.ok) {
+      throw new Error(`REST API returned ${response.status}`);
+    }
+    const resData = await response.json();
+    const result = {
+      articles: resData.articles as Article[],
+      totalCount: resData.totalCount as number,
+      hasMore: resData.hasMore as boolean
+    };
+
+    SmartCache.set(cacheKey, result, 'local');
+    return result;
+  } catch (err) {
+    console.warn('REST API paginated fetch failed, falling back to full list slice:', err);
+    const allArticles = await getAllArticles(false, false);
+    let list = allArticles;
+    if (category) {
+      list = list.filter(art => {
+        const cats = art.categories && art.categories.length > 0 ? art.categories : [art.category];
+        return cats.some(c => c.toLowerCase() === category.toLowerCase());
+      });
+    }
+    const startIndex = (page - 1) * pageSize;
+    const sliced = list.slice(startIndex, startIndex + pageSize);
+    const result = {
+      articles: sliced,
+      totalCount: list.length,
+      hasMore: startIndex + pageSize < list.length
+    };
+    SmartCache.set(cacheKey, result, 'local');
+    return result;
   }
 }
 
@@ -652,6 +888,13 @@ export async function saveArticle(article: Article): Promise<void> {
   }
   LocalDbFallback.saveArticles(local);
 
+  // Invalidate client caches
+  SmartCache.invalidate('articles_');
+  SmartCache.invalidate('article_slug_');
+  
+  // Invalidate server cache asynchronously
+  fetch('/api/articles/clear-cache', { method: 'POST' }).catch(() => {});
+
   if (shouldBypassFirestore()) return;
 
   try {
@@ -671,6 +914,13 @@ export async function deleteArticle(articleId: string): Promise<void> {
   const filtered = local.filter(a => a.id !== articleId);
   LocalDbFallback.saveArticles(filtered);
 
+  // Invalidate client caches
+  SmartCache.invalidate('articles_');
+  SmartCache.invalidate('article_slug_');
+
+  // Invalidate server cache asynchronously
+  fetch('/api/articles/clear-cache', { method: 'POST' }).catch(() => {});
+
   if (shouldBypassFirestore()) return;
 
   try {
@@ -682,13 +932,22 @@ export async function deleteArticle(articleId: string): Promise<void> {
 
 // ---------------- Comments ----------------
 
-// Fetch comments for an article
-export async function getCommentsForArticle(articleId: string): Promise<Comment[]> {
-  const path = `articles/${articleId}/comments`;
+// Fetch comments for an article (cached for 5 minutes)
+export async function getCommentsForArticle(articleId: string, forceRefresh = false): Promise<Comment[]> {
+  const cacheKey = `comments_article_${articleId}`;
+  const ttl = 5 * 60 * 1000; // 5 minutes
 
   if (shouldBypassFirestore()) {
     const localComments = LocalDbFallback.getComments();
     return localComments.filter(c => c.articleId === articleId && c.approved);
+  }
+
+  if (!forceRefresh) {
+    const cached = SmartCache.get<Comment[]>(cacheKey, ttl, 'session');
+    if (cached) {
+      console.log(`[SmartCache Hit] Serving comments from session cache for article: ${articleId}`);
+      return cached;
+    }
   }
 
   try {
@@ -697,6 +956,8 @@ export async function getCommentsForArticle(articleId: string): Promise<Comment[
     const snapshot = await withTimeout(getDocs(q));
     const comments = snapshot.docs.map(doc => doc.data() as Comment);
     
+    SmartCache.set(cacheKey, comments, 'session');
+
     // Merge into local cache
     const cachedComments = LocalDbFallback.getComments().filter(c => c.articleId !== articleId);
     LocalDbFallback.saveComments([...cachedComments, ...comments]);
@@ -774,6 +1035,9 @@ export async function addCommentToArticle(articleId: string, comment: Comment): 
   }
   LocalDbFallback.saveComments(comments);
 
+  // Invalidate comments cache for this article
+  SmartCache.invalidate(`comments_article_${articleId}`);
+
   if (shouldBypassFirestore()) return;
 
   try {
@@ -796,6 +1060,9 @@ export async function approveComment(articleId: string, commentId: string): Prom
     LocalDbFallback.saveComments(comments);
   }
 
+  // Invalidate comments cache for this article
+  SmartCache.invalidate(`comments_article_${articleId}`);
+
   if (shouldBypassFirestore()) return;
 
   try {
@@ -814,6 +1081,9 @@ export async function deleteComment(articleId: string, commentId: string): Promi
   const comments = LocalDbFallback.getComments();
   const filtered = comments.filter(c => c.id !== commentId);
   LocalDbFallback.saveComments(filtered);
+
+  // Invalidate comments cache for this article
+  SmartCache.invalidate(`comments_article_${articleId}`);
 
   if (shouldBypassFirestore()) return;
 
@@ -875,21 +1145,28 @@ export async function getNewsletterSubscribers(): Promise<NewsletterSubscription
 
 // ---------------- Advertisement Management ----------------
 
-// Fetch active ads
+// Fetch active ads (cached for 1 hour)
 export async function getActiveAds(): Promise<AdPlacement[]> {
-  const path = 'ads';
+  const cacheKey = 'active_ads';
+  const ttl = 1 * 60 * 60 * 1000; // 1 hour
 
   if (shouldBypassFirestore()) {
     return LocalDbFallback.getAds().filter(ad => ad.active);
   }
 
+  const cached = SmartCache.get<AdPlacement[]>(cacheKey, ttl, 'local');
+  if (cached) {
+    return cached;
+  }
+
   try {
-    const colRef = collection(db, path);
+    const colRef = collection(db, 'ads');
     const q = query(colRef, where('active', '==', true));
     const snapshot = await withTimeout(getDocs(q));
     if (snapshot.empty) return SEED_ADS.filter(ad => ad.active);
     const ads = snapshot.docs.map(doc => doc.data() as AdPlacement);
     LocalDbFallback.saveAds(ads);
+    SmartCache.set(cacheKey, ads, 'local');
     return ads;
   } catch (error) {
     flagFirestoreUnavailable(error);
@@ -897,19 +1174,26 @@ export async function getActiveAds(): Promise<AdPlacement[]> {
   }
 }
 
-// Fetch all ads (for admin)
+// Fetch all ads (for admin - cached for 5 minutes)
 export async function getAllAds(): Promise<AdPlacement[]> {
-  const path = 'ads';
+  const cacheKey = 'all_ads';
+  const ttl = 5 * 60 * 1000; // 5 minutes
 
   if (shouldBypassFirestore()) {
     return LocalDbFallback.getAds();
   }
 
+  const cached = SmartCache.get<AdPlacement[]>(cacheKey, ttl, 'local');
+  if (cached) {
+    return cached;
+  }
+
   try {
-    const colRef = collection(db, path);
+    const colRef = collection(db, 'ads');
     const snapshot = await withTimeout(getDocs(colRef));
     const ads = snapshot.docs.map(doc => doc.data() as AdPlacement);
     LocalDbFallback.saveAds(ads);
+    SmartCache.set(cacheKey, ads, 'local');
     return ads;
   } catch (error) {
     flagFirestoreUnavailable(error);
@@ -1035,19 +1319,26 @@ export async function submitContactMessage(msg: ContactMessage): Promise<void> {
 
 // ---------------- Authors / User Profiles ----------------
 
-// Fetch all authors/user profiles
+// Fetch all authors/user profiles (cached for 24 hours)
 export async function getAllAuthors(): Promise<Author[]> {
-  const path = 'authors';
+  const cacheKey = 'all_authors';
+  const ttl = 24 * 60 * 60 * 1000; // 24 hours
 
   if (shouldBypassFirestore()) {
     return LocalDbFallback.getAuthors();
   }
 
+  const cached = SmartCache.get<Author[]>(cacheKey, ttl, 'local');
+  if (cached) {
+    return cached;
+  }
+
   try {
-    const colRef = collection(db, path);
+    const colRef = collection(db, 'authors');
     const snapshot = await withTimeout(getDocs(colRef));
     const list = snapshot.docs.map(doc => doc.data() as Author);
     LocalDbFallback.saveAuthors(list);
+    SmartCache.set(cacheKey, list, 'local');
     return list;
   } catch (error) {
     flagFirestoreUnavailable(error);

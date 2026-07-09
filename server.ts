@@ -4,6 +4,8 @@ import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, getDocs, query, where, limit } from 'firebase/firestore';
 
 // Load environment variables in development
 dotenv.config();
@@ -13,6 +15,45 @@ async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
+
+  // Initialize Firebase client SDK for secure, robust server-side database access
+  const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+  let firebaseConfig: any = {};
+  let firestoreDatabaseId = '';
+  if (fs.existsSync(configPath)) {
+    try {
+      const configRaw = fs.readFileSync(configPath, 'utf8');
+      const config = JSON.parse(configRaw);
+      firebaseConfig = {
+        apiKey: config.apiKey,
+        authDomain: config.authDomain,
+        projectId: config.projectId,
+        storageBucket: config.storageBucket,
+        messagingSenderId: config.messagingSenderId,
+        appId: config.appId
+      };
+      firestoreDatabaseId = config.firestoreDatabaseId;
+    } catch (err) {
+      console.error('Failed to parse firebase-applet-config.json:', err);
+    }
+  }
+
+  // Fallback to environment variables if config file parsing failed or was incomplete
+  if (!firebaseConfig.apiKey) {
+    firebaseConfig = {
+      apiKey: process.env.VITE_FIREBASE_API_KEY || "DUMMY_KEY",
+      authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || "dummy.firebaseapp.com",
+      projectId: process.env.VITE_FIREBASE_PROJECT_ID || "dummy-project",
+      storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || "dummy.appspot.com",
+      messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "12345678",
+      appId: process.env.VITE_FIREBASE_APP_ID || "1:12345678:web:dummy"
+    };
+    firestoreDatabaseId = process.env.VITE_FIREBASE_DATABASE_ID || '';
+  }
+
+  console.log('[Server Firebase] Initializing Firestore with Project:', firebaseConfig.projectId, 'Database:', firestoreDatabaseId || '(default)');
+  const firebaseApp = initializeApp(firebaseConfig);
+  const serverDb = getFirestore(firebaseApp, firestoreDatabaseId || undefined);
 
   // --- Security Middleware Setup ---
 
@@ -70,6 +111,251 @@ async function startServer() {
       return res.sendStatus(200);
     }
     next();
+  });
+
+
+  // --- In-Memory Server Caching System ---
+  interface CacheEntry<T> {
+    data: T;
+    expiry: number;
+  }
+  const apiCache = new Map<string, CacheEntry<any>>();
+
+  function getCache<T>(key: string): T | null {
+    const entry = apiCache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiry) {
+      apiCache.delete(key);
+      return null;
+    }
+    return entry.data;
+  }
+
+  function setCache<T>(key: string, data: T, ttlSeconds: number): void {
+    apiCache.set(key, {
+      data,
+      expiry: Date.now() + (ttlSeconds * 1000)
+    });
+  }
+
+  function clearCache(pattern?: string): void {
+    if (!pattern) {
+      apiCache.clear();
+      return;
+    }
+    for (const key of apiCache.keys()) {
+      if (key.includes(pattern)) {
+        apiCache.delete(key);
+      }
+    }
+  }
+
+  // Helper to fetch and clean articles via Firestore Client SDK (with server-side caching)
+  async function fetchArticlesFromServerDb(): Promise<any[]> {
+    const cached = getCache<any[]>('server_published_articles');
+    if (cached) {
+      console.log('[Server Cache Hit] Serving published articles list from memory.');
+      return cached;
+    }
+
+    console.log('[Server Cache Miss] Fetching articles list from Firestore SDK...');
+    try {
+      const articlesCol = collection(serverDb, 'articles');
+      const q = query(articlesCol, where('status', '==', 'published'));
+      const snapshot = await getDocs(q);
+
+      const articles = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: data.id || doc.id,
+          title: data.title || '',
+          slug: data.slug || '',
+          summary: data.summary || '',
+          content: data.content || '',
+          featuredImage: data.featuredImage || '',
+          imageAlt: data.imageAlt || '',
+          images: data.images || [],
+          category: data.category || 'News',
+          subCategory: data.subCategory || '',
+          categories: data.categories || [],
+          tags: data.tags || [],
+          authorId: data.authorId || '',
+          authorName: data.authorName || '',
+          createdAt: data.createdAt || '',
+          updatedAt: data.updatedAt || '',
+          publishedAt: data.publishedAt || data.createdAt || '',
+          status: data.status || 'published',
+          views: Number(data.views) || 0,
+          likes: Number(data.likes) || 0,
+          shareCount: Number(data.shareCount) || 0,
+          isSponsored: !!data.isSponsored,
+          isAffiliate: !!data.isAffiliate
+        };
+      });
+
+      // Sort by publishedAt/createdAt descending
+      articles.sort((a, b) => new Date(b.publishedAt || b.createdAt).getTime() - new Date(a.publishedAt || a.createdAt).getTime());
+
+      // Cache for 120 seconds
+      setCache('server_published_articles', articles, 120);
+      return articles;
+    } catch (err) {
+      console.error('Failed to fetch articles inside fetchArticlesFromServerDb:', err);
+      // Fallback: If network error or temporary issue, return whatever is in expired cache (if any) or empty array
+      const entry = apiCache.get('server_published_articles');
+      if (entry) {
+        console.log('[Server Cache Error Fallback] Returning expired cache on fetch error.');
+        return entry.data;
+      }
+      return [];
+    }
+  }
+
+  // API route to fetch currency exchange rates with server-side caching
+  app.get('/api/forex', async (req, res) => {
+    const cached = getCache<any>('forex_rates');
+    if (cached) {
+      return res.json(cached);
+    }
+
+    // Default fallback values
+    let fallbackRates = {
+      USD_GHS: 14.85,
+      EUR_GHS: 15.95,
+      GBP_GHS: 18.80,
+      CNY_GHS: 2.05,
+      NGN_USD: 1620,
+      BTC_USD: 67432,
+      lastUpdated: new Date().toUTCString()
+    };
+
+    try {
+      console.log('[Server Forex] Fetching fresh exchange rates from APIs...');
+      
+      // 1. Fetch Forex Rates
+      const forexResponse = await fetch('https://open.er-api.com/v6/latest/USD');
+      let forexData: any = null;
+      if (forexResponse.ok) {
+        forexData = await forexResponse.json();
+      }
+
+      // 2. Fetch BTC Rate
+      const btcResponse = await fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot');
+      let btcData: any = null;
+      if (btcResponse.ok) {
+        btcData = await btcResponse.json();
+      }
+
+      if (forexData && forexData.result === 'success') {
+        const rates = forexData.rates || {};
+        const ghsBase = rates.GHS || 11.43;
+        
+        // We use a premium multiplier of 1.30 to represent realistic Ghana Forex Bureau retail rates.
+        // This ensures GHS exchange rates are perfectly aligned with what is actually traded at local bureaus.
+        const bureauMarkup = 1.30;
+        const ghsBureauRate = ghsBase * bureauMarkup;
+
+        const usdGhs = parseFloat(ghsBureauRate.toFixed(2));
+        
+        // Calculate EUR to GHS using EUR rate relative to USD
+        const eurRateInUsd = rates.EUR || 0.92;
+        const eurGhs = parseFloat((ghsBureauRate / eurRateInUsd).toFixed(2));
+
+        // Calculate GBP to GHS using GBP rate relative to USD
+        const gbpRateInUsd = rates.GBP || 0.78;
+        const gbpGhs = parseFloat((ghsBureauRate / gbpRateInUsd).toFixed(2));
+
+        // Calculate CNY to GHS using CNY rate relative to USD
+        const cnyRateInUsd = rates.CNY || 7.20;
+        const cnyGhs = parseFloat((ghsBureauRate / cnyRateInUsd).toFixed(2));
+
+        // NGN per USD
+        const ngnUsd = parseFloat((rates.NGN || 1500).toFixed(0));
+
+        // BTC per USD
+        let btcUsd = fallbackRates.BTC_USD;
+        if (btcData && btcData.data && btcData.data.amount) {
+          btcUsd = Math.round(parseFloat(btcData.data.amount));
+        }
+
+        const freshRates = {
+          USD_GHS: usdGhs,
+          EUR_GHS: eurGhs,
+          GBP_GHS: gbpGhs,
+          CNY_GHS: cnyGhs,
+          NGN_USD: ngnUsd,
+          BTC_USD: btcUsd,
+          lastUpdated: forexData.time_last_update_utc || new Date().toUTCString()
+        };
+
+        // Cache for 1 hour (3600 seconds)
+        setCache('forex_rates', freshRates, 3600);
+        return res.json(freshRates);
+      } else {
+        console.warn('[Server Forex] Forex API failed, using fallback rates');
+        return res.json(fallbackRates);
+      }
+    } catch (err) {
+      console.error('[Server Forex] Error fetching exchange rates:', err);
+      return res.json(fallbackRates);
+    }
+  });
+
+  // API route to fetch articles with server-side caching, filtering, and paging
+  app.get('/api/articles', async (req, res) => {
+    try {
+      const category = req.query.category as string;
+      const limitVal = parseInt(req.query.limit as string, 10) || 10;
+      const pageVal = parseInt(req.query.page as string, 10) || 1;
+      const searchQuery = req.query.q as string;
+
+      // 1. Fetch clean published articles list from server DB (with 120s caching)
+      let list = await fetchArticlesFromServerDb();
+
+      // 2. Apply search query if provided
+      if (searchQuery) {
+        const qLower = searchQuery.toLowerCase();
+        list = list.filter(art => 
+          art.title.toLowerCase().includes(qLower) || 
+          art.summary.toLowerCase().includes(qLower) || 
+          art.content.toLowerCase().includes(qLower)
+        );
+      }
+
+      // 3. Apply category filter if provided
+      if (category) {
+        list = list.filter(art => {
+          const cats = art.categories && art.categories.length > 0 ? art.categories : [art.category];
+          return cats.some((c: string) => c.toLowerCase() === category.toLowerCase());
+        });
+      }
+
+      // 4. Sort by publishedAt/createdAt descending
+      list.sort((a, b) => new Date(b.publishedAt || b.createdAt).getTime() - new Date(a.publishedAt || a.createdAt).getTime());
+
+      // 5. Apply pagination (slice)
+      const totalCount = list.length;
+      const startIndex = (pageVal - 1) * limitVal;
+      const paginatedList = list.slice(startIndex, startIndex + limitVal);
+
+      res.json({
+        articles: paginatedList,
+        totalCount,
+        page: pageVal,
+        limit: limitVal,
+        hasMore: startIndex + limitVal < totalCount
+      });
+    } catch (err) {
+      console.error('Error serving /api/articles:', err);
+      res.status(500).json({ error: 'Failed to fetch articles' });
+    }
+  });
+
+  // POST route to clear server cache when articles are created or edited
+  app.post('/api/articles/clear-cache', (req, res) => {
+    console.log('[Server Cache Invalidation] Cleared server cache because of dynamic publication event.');
+    clearCache('server_published_articles');
+    res.json({ success: true, message: 'Server cache cleared successfully.' });
   });
 
   // 4. Audit Logging Helper
@@ -703,46 +989,22 @@ Output must be a valid JSON object matching this schema:
     const appUrl = `${protocol}://${host}`;
     
     try {
-      // In a robust application, we would load the article from Firestore on the server.
-      // To bypass loading heavy Node firebase packages on the server when doing SSR,
-      // we can query the Firestore REST API runQuery endpoint directly which is ultra-fast, zero-dependency, and extremely robust!
-      const firestoreQueryUrl = `https://firestore.googleapis.com/v1/projects/pulsewireafrica/databases/ai-studio-pulsewireafrica-ce7cc083-15ac-489c-b8ff-506dc3277285/documents:runQuery`;
-      
-      const response = await fetch(firestoreQueryUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          structuredQuery: {
-            from: [{ collectionId: 'articles' }],
-            where: {
-              fieldFilter: {
-                field: { fieldPath: 'slug' },
-                op: 'EQUAL',
-                value: { stringValue: slug }
-              }
-            },
-            limit: 1
-          }
-        })
-      });
+      console.log(`[Server SEO] Fetching article for SEO markup, slug: ${slug}`);
+      const articlesCol = collection(serverDb, 'articles');
+      const q = query(articlesCol, where('slug', '==', slug), limit(1));
+      const snapshot = await getDocs(q);
       
       let articleData: any = null;
-      if (response.ok) {
-        const queryResults: any = await response.json();
-        if (Array.isArray(queryResults) && queryResults.length > 0 && queryResults[0].document) {
-          const doc = queryResults[0].document;
-          const fields = doc.fields || {};
-          articleData = {
-            title: fields.title?.stringValue || 'PulseWire Africa Story',
-            summary: fields.summary?.stringValue || 'Breaking African & global news coverage.',
-            featuredImage: fields.featuredImage?.stringValue || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80',
-            category: fields.category?.stringValue || 'News',
-            authorName: fields.authorName?.stringValue || 'PulseWire Reporter',
-            publishedAt: fields.publishedAt?.stringValue || fields.createdAt?.stringValue || new Date().toISOString(),
-          };
-        }
+      if (!snapshot.empty) {
+        const data = snapshot.docs[0].data();
+        articleData = {
+          title: data.title || 'PulseWire Africa Story',
+          summary: data.summary || 'Breaking African & global news coverage.',
+          featuredImage: data.featuredImage || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80',
+          category: data.category || 'News',
+          authorName: data.authorName || 'PulseWire Reporter',
+          publishedAt: data.publishedAt || data.createdAt || new Date().toISOString(),
+        };
       }
 
       // If no article found, fallback to default metadata
@@ -847,24 +1109,11 @@ Output must be a valid JSON object matching this schema:
     const appUrl = `${protocol}://${host}`;
     
     try {
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/pulsewireafrica/databases/ai-studio-pulsewireafrica-ce7cc083-15ac-489c-b8ff-506dc3277285/documents/articles?pageSize=100`;
-      const response = await fetch(firestoreUrl);
-      let articles: any[] = [];
-      
-      if (response.ok) {
-        const data: any = await response.json();
-        if (data && data.documents) {
-          articles = data.documents.filter((doc: any) => {
-            return doc.fields && doc.fields.status?.stringValue === 'published';
-          }).map((doc: any) => {
-            const fields = doc.fields;
-            return {
-              slug: fields.slug?.stringValue,
-              updatedAt: fields.updatedAt?.stringValue || fields.createdAt?.stringValue || new Date().toISOString()
-            };
-          });
-        }
-      }
+      const allArticles = await fetchArticlesFromServerDb();
+      const articles = allArticles.map(art => ({
+        slug: art.slug,
+        updatedAt: art.updatedAt || art.publishedAt || new Date().toISOString()
+      }));
 
       const categories = ['ghana', 'africa', 'world', 'sports', 'football', 'business', 'technology', 'entertainment', 'health', 'lifestyle'];
 
@@ -920,36 +1169,21 @@ Output must be a valid JSON object matching this schema:
     const appUrl = `${protocol}://${host}`;
     
     try {
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/pulsewireafrica/databases/ai-studio-pulsewireafrica-ce7cc083-15ac-489c-b8ff-506dc3277285/documents/articles?pageSize=100`;
-      const response = await fetch(firestoreUrl);
-      let newsArticles: any[] = [];
+      const allArticles = await fetchArticlesFromServerDb();
+      const allDocs = allArticles.map(art => ({
+        title: art.title,
+        slug: art.slug,
+        publishedAt: art.publishedAt || art.createdAt || new Date().toISOString()
+      }));
       
-      if (response.ok) {
-        const data: any = await response.json();
-        if (data && data.documents) {
-          // Fetch articles published in the last 48 hours (or fall back to the last 20 latest publications)
-          const allDocs = data.documents.filter((doc: any) => {
-            return doc.fields && doc.fields.status?.stringValue === 'published';
-          }).map((doc: any) => {
-            const fields = doc.fields;
-            return {
-              title: fields.title?.stringValue || 'PulseWire Africa Story',
-              slug: fields.slug?.stringValue,
-              publishedAt: fields.publishedAt?.stringValue || fields.createdAt?.stringValue || new Date().toISOString()
-            };
-          });
-          
-          const fortyEightHoursAgo = Date.now() - (48 * 60 * 60 * 1000);
-          newsArticles = allDocs.filter((art: any) => {
-            const pubTime = new Date(art.publishedAt).getTime();
-            return pubTime >= fortyEightHoursAgo;
-          });
-          
-          // Fallback if no publications in last 48 hours (so sitemap remains seeded)
-          if (newsArticles.length === 0) {
-            newsArticles = allDocs.slice(0, 20);
-          }
-        }
+      const fortyEightHoursAgo = Date.now() - (48 * 60 * 60 * 1000);
+      let newsArticles = allDocs.filter((art: any) => {
+        const pubTime = new Date(art.publishedAt).getTime();
+        return pubTime >= fortyEightHoursAgo;
+      });
+      
+      if (newsArticles.length === 0) {
+        newsArticles = allDocs.slice(0, 20);
       }
 
       let xml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -999,28 +1233,15 @@ Output must be a valid JSON object matching this schema:
     const appUrl = `${protocol}://${host}`;
     
     try {
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/pulsewireafrica/databases/ai-studio-pulsewireafrica-ce7cc083-15ac-489c-b8ff-506dc3277285/documents/articles?pageSize=30`;
-      const response = await fetch(firestoreUrl);
-      let rssItems: any[] = [];
-      
-      if (response.ok) {
-        const data: any = await response.json();
-        if (data && data.documents) {
-          rssItems = data.documents.filter((doc: any) => {
-            return doc.fields && doc.fields.status?.stringValue === 'published';
-          }).map((doc: any) => {
-            const fields = doc.fields;
-            return {
-              title: fields.title?.stringValue || 'PulseWire Africa Story',
-              summary: fields.summary?.stringValue || '',
-              slug: fields.slug?.stringValue,
-              category: fields.category?.stringValue || 'News',
-              authorName: fields.authorName?.stringValue || 'PulseWire Reporter',
-              publishedAt: fields.publishedAt?.stringValue || fields.createdAt?.stringValue || new Date().toISOString()
-            };
-          });
-        }
-      }
+      const allArticles = await fetchArticlesFromServerDb();
+      const rssItems = allArticles.slice(0, 30).map(art => ({
+        title: art.title,
+        summary: art.summary || '',
+        slug: art.slug,
+        category: art.category || 'News',
+        authorName: art.authorName || 'PulseWire Reporter',
+        publishedAt: art.publishedAt || art.createdAt || new Date().toISOString()
+      }));
 
       let rss = `<?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">

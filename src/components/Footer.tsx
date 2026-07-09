@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { subscribeNewsletter } from '../lib/db';
 import { Mail, Check, AlertCircle, ArrowRight, Twitter, Facebook, Instagram, Linkedin, Globe } from 'lucide-react';
 import { CATEGORIES } from '../types';
@@ -13,6 +13,40 @@ export default function Footer({ navigate }: FooterProps) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
+
+  const [rates, setRates] = useState<{
+    USD_GHS: number;
+    EUR_GHS: number;
+    GBP_GHS: number;
+    CNY_GHS: number;
+    NGN_USD: number;
+    BTC_USD: number;
+  }>({
+    USD_GHS: 14.85,
+    EUR_GHS: 15.95,
+    GBP_GHS: 18.80,
+    CNY_GHS: 2.05,
+    NGN_USD: 1620,
+    BTC_USD: 67432
+  });
+
+  useEffect(() => {
+    fetch('/api/forex')
+      .then(res => res.json())
+      .then(data => {
+        if (data) {
+          setRates({
+            USD_GHS: data.USD_GHS || 14.85,
+            EUR_GHS: data.EUR_GHS || 15.95,
+            GBP_GHS: data.GBP_GHS || 18.80,
+            CNY_GHS: data.CNY_GHS || 2.05,
+            NGN_USD: data.NGN_USD || 1620,
+            BTC_USD: data.BTC_USD || 67432
+          });
+        }
+      })
+      .catch(err => console.error('Failed to fetch forex rates:', err));
+  }, []);
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,11 +269,27 @@ export default function Footer({ navigate }: FooterProps) {
       <div className="border-t border-slate-200 dark:border-gray-950 bg-white dark:bg-gray-950 py-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] text-slate-500 font-medium uppercase tracking-wider">
           <div className="flex items-center gap-6 overflow-x-auto whitespace-nowrap scrollbar-none py-1">
-            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> GHS/USD 14.85</span>
-            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> NGN/USD 1,620</span>
-            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> BTC/USD 67,432</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+            <span className="flex items-center gap-1 font-mono text-[10px] text-slate-700 dark:text-gray-300">
+              USD/GHS <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{rates.USD_GHS.toFixed(2)}</strong>
+            </span>
+            <span className="flex items-center gap-1 font-mono text-[10px] text-slate-700 dark:text-gray-300">
+              EUR/GHS <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{rates.EUR_GHS.toFixed(2)}</strong>
+            </span>
+            <span className="flex items-center gap-1 font-mono text-[10px] text-slate-700 dark:text-gray-300">
+              GBP/GHS <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{rates.GBP_GHS.toFixed(2)}</strong>
+            </span>
+            <span className="flex items-center gap-1 font-mono text-[10px] text-slate-700 dark:text-gray-300">
+              CNY/GHS <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{rates.CNY_GHS.toFixed(2)}</strong>
+            </span>
+            <span className="flex items-center gap-1 font-mono text-[10px] text-slate-700 dark:text-gray-300">
+              NGN/USD <strong className="text-slate-600 dark:text-gray-400 font-bold">{rates.NGN_USD.toLocaleString()}</strong>
+            </span>
+            <span className="flex items-center gap-1 font-mono text-[10px] text-slate-700 dark:text-gray-300">
+              BTC/USD <strong className="text-emerald-600 dark:text-emerald-400 font-bold">${rates.BTC_USD.toLocaleString()}</strong>
+            </span>
           </div>
-          <div className="flex items-center gap-4 text-[10px] shrink-0 font-sans font-semibold text-slate-400 dark:text-gray-500">
+          <div className="flex items-center gap-4 text-[10px] shrink-0 font-sans font-semibold text-slate-400 dark:text-gray-500 font-mono">
             <span>© 2026 PulseWire Africa all rights reserved</span>
             <span className="hidden md:inline">•</span>
             <div className="flex gap-3">
