@@ -88,9 +88,11 @@ class LocalDbFallback {
         console.warn('localStorage quota exceeded. Retrying with ultra-minimal fallback data...');
         try {
           if (key === 'pulsewire_fallback_articles' && Array.isArray(value)) {
-            const pruned = value.slice(0, 5).map(art => ({
+            const pruned = value.slice(0, 10).map(art => ({
               ...art,
-              content: art.content ? art.content.slice(0, 300) + '... [Truncated due to storage limits]' : ''
+              content: art.content && art.content.length > 2000
+                ? art.content.slice(0, 2000) + '... [Truncated due to storage limits]'
+                : art.content
             }));
             localStorage.setItem(key, JSON.stringify(pruned));
           } else {
@@ -110,15 +112,12 @@ class LocalDbFallback {
   }
 
   static saveArticles(articles: Article[]) {
-    // Proactively limit count and content size to prevent exceeding the browser localStorage quota
-    const optimized = articles.slice(0, 15).map(art => ({
+    // Keep full text intact. We only proactively filter out heavy base64 strings to prevent instant quota failure.
+    const cleanArticles = articles.map(art => ({
       ...art,
-      content: art.content && art.content.length > 2000 
-        ? art.content.slice(0, 2000) + '... [Truncated for offline storage]' 
-        : art.content,
       images: art.images ? art.images.filter(img => !img.startsWith('data:image')) : []
     }));
-    this.set('pulsewire_fallback_articles', optimized);
+    this.set('pulsewire_fallback_articles', cleanArticles);
   }
 
   static getComments(): Comment[] {
