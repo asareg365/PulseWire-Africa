@@ -123,16 +123,33 @@ export default function App() {
 
       if (isSignUp) {
         const userCredential = await createUserWithEmailAndPassword(auth, emailToUse, passwordToUse);
-        await saveAuthor({
-          id: userCredential.user.uid,
-          name: authName,
-          email: emailToUse,
-          role: authRole,
-          status: authRole === 'reader' ? 'approved' : 'pending',
-          bio: '',
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(authName || 'User')}&background=f1f5f9&color=dc2626&bold=true&size=256`,
-          createdAt: new Date().toISOString(),
-        });
+        
+        // Match existing pre-created author profile by email (if admin created one)
+        const existingProfile = await getAuthorById(emailToUse.toLowerCase());
+        
+        if (existingProfile) {
+          const migratedProfile = {
+            ...existingProfile,
+            id: userCredential.user.uid, // migrate to Auth UID
+            name: authName || existingProfile.name,
+            role: existingProfile.role, // preserve assigned role
+          };
+          await saveAuthor(migratedProfile);
+          if (existingProfile.id !== userCredential.user.uid) {
+            await deleteAuthor(existingProfile.id).catch(e => console.warn(e));
+          }
+        } else {
+          await saveAuthor({
+            id: userCredential.user.uid,
+            name: authName,
+            email: emailToUse,
+            role: authRole,
+            status: authRole === 'reader' ? 'approved' : 'pending',
+            bio: '',
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(authName || 'User')}&background=f1f5f9&color=dc2626&bold=true&size=256`,
+            createdAt: new Date().toISOString(),
+          });
+        }
         navigate('/');
       } else {
         try {
@@ -368,11 +385,22 @@ export default function App() {
             }
           }
           if (author) {
+            const isSuperAdmin = ['asareg365@gmail.com', 'pulsewireafrica@gmail.com'].map(e => e.toLowerCase()).includes(user.email?.trim().toLowerCase() || '');
+            if (isSuperAdmin && (author.role !== 'admin' || author.email !== user.email)) {
+              console.log("Self-healing super admin profile...");
+              author.role = 'admin';
+              author.email = user.email || author.email;
+              author.status = 'approved';
+              try {
+                await saveAuthor(author);
+              } catch (e) {
+                console.error("Error healing superadmin profile:", e);
+              }
+            }
             setCurrentUserAuthor(author);
             setSavedSlugs(author.savedSlugs || []);
             
             // Sync isAdmin based on email for header shortcut immediately on load
-            const isSuperAdmin = ['asareg365@gmail.com', 'pulsewireafrica@gmail.com'].map(e => e.toLowerCase()).includes(user.email?.trim().toLowerCase() || '');
             setIsAdmin(isSuperAdmin);
           }
         } else {
@@ -1136,35 +1164,8 @@ export default function App() {
         </div>
       )}
 
-      {/* Firestore fallback reminder banner */}
-      {usingFallback && (
-        <div className="bg-amber-600 text-white text-xs py-2.5 px-4 font-sans font-medium flex items-center justify-between shadow-md" id="offline-fallback-banner">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0 animate-pulse text-white" />
-            <span>
-              <strong>Offline Mode</strong> — displaying the latest available news while checking for updates.
-            </span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button 
-              onClick={handleReconnect}
-              disabled={isRefreshing}
-              className="bg-white text-amber-900 hover:bg-white/95 disabled:opacity-50 font-bold uppercase tracking-wider px-3 py-1 rounded text-[10px] shrink-0 transition-all shadow-sm flex items-center gap-1 cursor-pointer"
-              id="btn-reconnect-live-db"
-            >
-              <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Reconnect Live DB
-            </button>
-            <button 
-              onClick={() => setUsingFallback(false)}
-              className="bg-black/20 hover:bg-black/30 text-white font-bold uppercase tracking-wider px-2.5 py-1 rounded text-[10px] shrink-0 transition-colors cursor-pointer"
-              id="btn-dismiss-fallback-banner"
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Firestore fallback reminder banner - Hidden by request to reduce quota annoyance */}
+      {/* usingFallback && ( ... ) */}
 
       {/* Main Content Layout Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">

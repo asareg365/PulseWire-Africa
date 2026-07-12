@@ -2025,7 +2025,7 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Login Password / Details</label>
+                  <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Temporary Password Note</label>
                   <input 
                     type="text" 
                     placeholder="e.g. securePass123"
@@ -2035,6 +2035,9 @@ export default function AdminDashboard({ navigate, email, role }: AdminDashboard
                   />
                 </div>
               </div>
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-950/30 p-2 rounded border border-amber-200 dark:border-amber-900/50">
+                ⚠️ Note: Creating a profile here does NOT automatically create a login account. The journalist must still go to the Login page, click "Need contributor credentials?", and sign up using this exact email address to claim their profile.
+              </p>
 
               <div>
                 <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Professional Bio</label>

@@ -210,8 +210,8 @@ function shouldBypassFirestore(): boolean {
 
 // Mark Firestore as unavailable and activate fallback mode
 function flagFirestoreUnavailable(error: any) {
-  console.warn("PulseWire Africa is switching to Local Offline Fallback Mode. Error detail:", error);
-  isFirestoreUnavailable = true;
+  console.warn("PulseWire Africa encountered a Firestore error (potentially quota). Gracefully handling without locking offline:", error);
+  // isFirestoreUnavailable = true; // Disabled to prevent annoying offline mode locks
 }
 
 export function isUsingLocalFallback(): boolean {

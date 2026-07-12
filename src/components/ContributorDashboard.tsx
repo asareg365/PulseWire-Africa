@@ -262,7 +262,7 @@ export default function ContributorDashboard({ navigate, currentUser }: Contribu
           </div>
         </div>
 
-        <button
+        <button type="button"
           id="write-story-top-btn"
           onClick={handleWriteNewStory}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white font-bold text-xs font-mono transition-all duration-200 hover:shadow-md cursor-pointer self-stretch sm:self-center text-center justify-center"
@@ -360,7 +360,7 @@ export default function ContributorDashboard({ navigate, currentUser }: Contribu
 
       {/* INNER DASHBOARD NAVIGATION */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6 gap-6 overflow-x-auto">
-        <button
+        <button type="button"
           onClick={() => setActiveTab('articles')}
           className={`pb-3 text-xs font-bold font-mono uppercase tracking-wider border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'articles' 
@@ -370,7 +370,7 @@ export default function ContributorDashboard({ navigate, currentUser }: Contribu
         >
           My Publications ({articles.length})
         </button>
-        <button
+        <button type="button"
           onClick={() => setActiveTab('write')}
           className={`pb-3 text-xs font-bold font-mono uppercase tracking-wider border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'write' 
@@ -380,7 +380,7 @@ export default function ContributorDashboard({ navigate, currentUser }: Contribu
         >
           {editingArticle ? `Edit: ${editingArticle.title.substring(0, 20)}...` : 'Write Story'}
         </button>
-        <button
+        <button type="button"
           onClick={() => setActiveTab('comments')}
           className={`pb-3 text-xs font-bold font-mono uppercase tracking-wider border-b-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'comments' 
@@ -413,7 +413,7 @@ export default function ContributorDashboard({ navigate, currentUser }: Contribu
                 <Filter className="h-3 w-3" /> Status:
               </span>
               {(['all', 'published', 'scheduled', 'draft'] as const).map(st => (
-                <button
+                <button type="button"
                   key={st}
                   onClick={() => setStatusFilter(st)}
                   className={`px-3 py-1 text-[10px] font-bold uppercase font-mono rounded-full border transition-all cursor-pointer ${
@@ -460,7 +460,7 @@ export default function ContributorDashboard({ navigate, currentUser }: Contribu
                       >
                         <td className="p-4">
                           <div className="max-w-md">
-                            <button
+                            <button type="button"
                               onClick={() => navigate(`/article/${art.slug}`)}
                               className="text-xs font-bold text-slate-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline text-left cursor-pointer transition-colors block font-sans"
                             >
@@ -503,7 +503,7 @@ export default function ContributorDashboard({ navigate, currentUser }: Contribu
                         </td>
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            <button
+                            <button type="button"
                               onClick={() => handleEditStory(art)}
                               className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
                               title="Edit Story"
@@ -513,13 +513,13 @@ export default function ContributorDashboard({ navigate, currentUser }: Contribu
 
                             {deleteConfirmId === art.id ? (
                               <div className="flex items-center gap-1.5">
-                                <button
+                                <button type="button"
                                   onClick={() => handleDeleteArticle(art.id)}
                                   className="px-2 py-0.5 bg-red-600 text-white rounded font-mono font-bold text-[9px] uppercase tracking-wider hover:bg-red-700"
                                 >
                                   Confirm
                                 </button>
-                                <button
+                                <button type="button"
                                   onClick={() => setDeleteConfirmId(null)}
                                   className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded font-mono font-bold text-[9px] uppercase tracking-wider hover:bg-slate-200"
                                 >
@@ -527,7 +527,7 @@ export default function ContributorDashboard({ navigate, currentUser }: Contribu
                                 </button>
                               </div>
                             ) : (
-                              <button
+                              <button type="button"
                                 onClick={() => setDeleteConfirmId(art.id)}
                                 className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
                                 title="Remove Story"

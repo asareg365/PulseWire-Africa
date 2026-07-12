@@ -399,9 +399,7 @@ async function startServer() {
   async function generateContentWithRetry(ai: any, params: any, retries = 4, delay = 1000, attemptedFallbacks = 0): Promise<any> {
     const currentModel = params.model || 'gemini-2.5-flash-lite';
     try {
-      // Force gemini-2.5-flash-lite for all requests to adhere strictly to the user's model preference instruction
-      const updatedParams = { ...params, model: 'gemini-2.5-flash-lite' };
-      return await ai.models.generateContent(updatedParams);
+      return await ai.models.generateContent(params);
     } catch (err: any) {
       const errMsg = err.message || '';
       const errStatus = err.status;
@@ -419,6 +417,20 @@ async function startServer() {
                           errMsg.includes('temporary') ||
                           errStatus === 503 ||
                           isRateLimit;
+
+      // If it's a transient 503 or high-demand error and we haven't tried fallback models too many times,
+      // let's try a fallback model alias to self-heal!
+      if (isTransient && attemptedFallbacks < 2) {
+        let nextModel = 'gemini-3.5-flash';
+        if (currentModel === 'gemini-3.5-flash') {
+          nextModel = 'gemini-2.5-flash';
+        }
+        
+        console.warn(`[Self-Healing] Primary model (${currentModel}) is unavailable or experiencing high demand. Swapping to fallback model (${nextModel})...`);
+        const updatedParams = { ...params, model: nextModel };
+        // Try with the fallback model, keeping the same retry budget but incrementing attemptedFallbacks
+        return generateContentWithRetry(ai, updatedParams, retries, delay, attemptedFallbacks + 1);
+      }
 
       if (isTransient && retries > 0) {
         const jitter = Math.floor(Math.random() * 500);
