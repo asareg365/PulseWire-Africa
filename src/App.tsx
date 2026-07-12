@@ -12,6 +12,7 @@ import {
   getActiveAds,
   subscribeNewsletter,
   saveAuthor,
+  deleteAuthor,
   getAuthorById,
   publishDueScheduledArticles,
   isUsingLocalFallback,
@@ -113,6 +114,13 @@ export default function App() {
     const passwordToUse = authPassword;
 
     try {
+      // Clear any existing session first to ensure a failed sign-in does not leak the previous session
+      try {
+        await signOut(auth);
+      } catch (signOutErr) {
+        console.warn('Signout before auth submit warning:', signOutErr);
+      }
+
       if (isSignUp) {
         const userCredential = await createUserWithEmailAndPassword(auth, emailToUse, passwordToUse);
         await saveAuthor({
@@ -321,6 +329,25 @@ export default function App() {
       async (user) => {
         if (user) {
           let author = await getAuthorById(user.uid);
+          if (!author && user.email) {
+            // Self-healing migration fallback: if no profile under user.uid, try matching by email-keyed document
+            const legacyEmailKey = user.email.trim().toLowerCase();
+            const emailAuthor = await getAuthorById(legacyEmailKey);
+            if (emailAuthor) {
+              console.log(`Migrating legacy email-keyed profile (${legacyEmailKey}) to user UID (${user.uid})`);
+              const migratedAuthor = { ...emailAuthor, id: user.uid };
+              try {
+                await saveAuthor(migratedAuthor);
+                author = migratedAuthor;
+                // Delete legacy email-keyed document to prevent duplicates
+                if (user.uid !== legacyEmailKey) {
+                  await deleteAuthor(legacyEmailKey);
+                }
+              } catch (migrationErr) {
+                console.error("Error performing profile migration:", migrationErr);
+              }
+            }
+          }
           if (!author) {
             const isSuperAdmin = ['asareg365@gmail.com', 'pulsewireafrica@gmail.com'].map(e => e.toLowerCase()).includes(user.email?.trim().toLowerCase() || '');
             const newAuthor: Author = {

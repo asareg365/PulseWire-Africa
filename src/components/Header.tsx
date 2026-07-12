@@ -133,13 +133,14 @@ export default function Header({
             setProfilePassword(matched.password || '');
           } else {
             const defaultName = activeUser.displayName || activeUser.email!.split('@')[0];
+            const isSuperAdmin = ['asareg365@gmail.com', 'pulsewireafrica@gmail.com'].map(e => e.toLowerCase()).includes(activeUser.email!.toLowerCase());
             const newProfile: Author = {
               id: activeUser.email!.toLowerCase(),
               name: defaultName,
               bio: '',
               avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(defaultName)}&background=f1f5f9&color=dc2626&bold=true&size=256`,
               email: activeUser.email!,
-              role: 'contributor',
+              role: isSuperAdmin ? 'admin' : 'contributor',
               createdAt: new Date().toISOString(),
               twitter: '',
               linkedin: '',

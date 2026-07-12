@@ -250,10 +250,8 @@ async function startServer() {
         const rates = forexData.rates || {};
         const ghsBase = rates.GHS || 11.43;
         
-        // We use a premium multiplier of 1.30 to represent realistic Ghana Forex Bureau retail rates.
-        // This ensures GHS exchange rates are perfectly aligned with what is actually traded at local bureaus.
-        const bureauMarkup = 1.30;
-        const ghsBureauRate = ghsBase * bureauMarkup;
+        // We use the raw rates from the API directly to show the real-time official rates.
+        const ghsBureauRate = ghsBase;
 
         const usdGhs = parseFloat(ghsBureauRate.toFixed(2));
         
@@ -397,49 +395,38 @@ async function startServer() {
     });
   }
 
-  // Resilient content generation with retries and self-healing fallback models for transient errors
+  // Resilient content generation with retries for transient errors
   async function generateContentWithRetry(ai: any, params: any, retries = 4, delay = 1000, attemptedFallbacks = 0): Promise<any> {
-    const currentModel = params.model || 'gemini-3.5-flash';
+    const currentModel = params.model || 'gemini-2.5-flash-lite';
     try {
-      return await ai.models.generateContent(params);
+      // Force gemini-2.5-flash-lite for all requests to adhere strictly to the user's model preference instruction
+      const updatedParams = { ...params, model: 'gemini-2.5-flash-lite' };
+      return await ai.models.generateContent(updatedParams);
     } catch (err: any) {
       const errMsg = err.message || '';
       const errStatus = err.status;
 
-      // Hard quota errors shouldn't be retried as they represent an exceeded limit
-      const isQuotaExceeded = errMsg.includes('429') || 
-                             errMsg.includes('Resource has been exhausted') ||
-                             errMsg.includes('quota') ||
-                             errMsg.includes('RESOURCE_EXHAUSTED') ||
-                             errStatus === 429;
+      // Treat 429 and RESOURCE_EXHAUSTED as transient rate limits that can be retried with backoff
+      const isRateLimit = errMsg.includes('429') || 
+                          errMsg.includes('Resource has been exhausted') ||
+                          errMsg.includes('quota') ||
+                          errMsg.includes('RESOURCE_EXHAUSTED') ||
+                          errStatus === 429;
 
-      const isTransient = (errMsg.includes('503') || 
-                           errMsg.includes('UNAVAILABLE') || 
-                           errMsg.includes('high demand') ||
-                           errMsg.includes('temporary') ||
-                           errStatus === 503) && !isQuotaExceeded;
-
-      // If it's a transient 503 or high-demand error and we haven't tried fallback models too many times,
-      // let's try a fallback model alias to self-heal!
-      if (isTransient && attemptedFallbacks < 2) {
-        let nextModel = 'gemini-flash-latest';
-        if (currentModel === 'gemini-flash-latest') {
-          nextModel = 'gemini-3.1-flash-lite';
-        } else if (currentModel === 'gemini-3.1-flash-lite') {
-          nextModel = 'gemini-3.5-flash'; // Avoid infinite loops
-        }
-        
-        console.warn(`[Self-Healing] Primary model (${currentModel}) is unavailable or experiencing high demand. Swapping to fallback model (${nextModel})...`);
-        const updatedParams = { ...params, model: nextModel };
-        // Try with the fallback model, keeping the same retry budget but incrementing attemptedFallbacks
-        return generateContentWithRetry(ai, updatedParams, retries, delay, attemptedFallbacks + 1);
-      }
+      const isTransient = errMsg.includes('503') || 
+                          errMsg.includes('UNAVAILABLE') || 
+                          errMsg.includes('high demand') ||
+                          errMsg.includes('temporary') ||
+                          errStatus === 503 ||
+                          isRateLimit;
 
       if (isTransient && retries > 0) {
         const jitter = Math.floor(Math.random() * 500);
-        const nextDelay = delay * 2 + jitter;
-        console.warn(`Gemini API returned transient error on ${currentModel}. Retrying in ${delay}ms... (Retries left: ${retries})`, errMsg);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        // For rate limits, use a longer base delay (min 2 seconds) to allow the window to clear
+        const baseDelay = isRateLimit ? Math.max(delay, 2000) : delay;
+        const nextDelay = baseDelay * 2 + jitter;
+        console.warn(`Gemini API returned rate limit or transient error on ${currentModel}. Retrying in ${baseDelay}ms... (Retries left: ${retries})`, errMsg);
+        await new Promise(resolve => setTimeout(resolve, baseDelay));
         return generateContentWithRetry(ai, params, retries - 1, nextDelay, attemptedFallbacks);
       }
       throw err;
@@ -463,7 +450,7 @@ Content:
 ${content}`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: prompt,
       });
 
@@ -504,7 +491,7 @@ Output must be valid JSON matching this schema:
 }`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -552,7 +539,7 @@ Sourced Text:
 ${content}`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: prompt,
       });
 
@@ -592,7 +579,7 @@ Output must be valid JSON matching this schema:
 }`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -652,7 +639,7 @@ Output must be valid JSON matching this schema:
 }`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -723,7 +710,7 @@ Output must be valid JSON matching this schema:
 }`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -786,7 +773,7 @@ Output must be valid JSON matching this schema:
 }`;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -885,7 +872,7 @@ Output must be a valid JSON object matching this schema:
 `;
 
       const response = await generateContentWithRetry(ai, {
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash-lite',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
